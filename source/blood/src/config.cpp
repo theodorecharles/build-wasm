@@ -249,7 +249,13 @@ void CONFIG_SetDefaults(void)
 {
     scripthandle = -1;
 
-#ifdef __ANDROID__
+#ifdef __EMSCRIPTEN__
+    // Keep the software renderer at a predictable internal resolution.  CSS
+    // scales the canvas to the page or fullscreen element without making the
+    // game redraw every pixel in the browser viewport.
+    gSetup.xdim = 960;
+    gSetup.ydim = 600;
+#elif defined __ANDROID__
     droidinput.forward_sens = 5.f;
     droidinput.gameControlsAlpha = 0.5;
     droidinput.hideStick = 0;
@@ -308,7 +314,11 @@ void CONFIG_SetDefaults(void)
 
     gSetup.forcesetup       = 1;
     gSetup.noautoload       = 1;
+#ifdef __EMSCRIPTEN__
+    gSetup.fullscreen       = 0;
+#else
     gSetup.fullscreen       = 1;
+#endif
     gSetup.usemouse         = 1;
 
     //ud.config.AmbienceToggle  = 1;

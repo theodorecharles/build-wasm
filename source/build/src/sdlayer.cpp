@@ -323,7 +323,7 @@ void wm_setapptitle(const char *name)
 //
 
 /* XXX: libexecinfo could be used on systems without gnu libc. */
-#if !defined _WIN32 && defined __GNUC__ && !defined __OpenBSD__ && !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined GEKKO && !defined EDUKE32_TOUCH_DEVICES && !defined __OPENDINGUX__
+#if !defined _WIN32 && defined __GNUC__ && !defined __OpenBSD__ && !(defined __APPLE__ && defined __BIG_ENDIAN__) && !defined GEKKO && !defined EDUKE32_TOUCH_DEVICES && !defined __OPENDINGUX__ && !defined __EMSCRIPTEN__
 # define PRINTSTACKONSEGV 1
 # include <execinfo.h>
 #endif
@@ -1741,6 +1741,13 @@ int setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int3
     else
 #endif
         refreshfreq = desktopmode.refresh_rate;
+#ifdef __EMSCRIPTEN__
+    // The Emscripten video driver reports an unspecified (zero) desktop refresh
+    // rate.  NBlood uses this value for its default frame limiter, so retain a
+    // browser-safe cadence instead of calculating an infinite frame delay.
+    if (refreshfreq <= 0)
+        refreshfreq = 60.0;
+#endif
 
     int const matchedResolution = (desktopmode.w == x && desktopmode.h == y);
     int const borderless = (r_borderless == 1 || (r_borderless == 2 && matchedResolution)) ? SDL_WINDOW_BORDERLESS : 0;
@@ -2185,6 +2192,35 @@ void videoShowFrame(int32_t w)
 
     if (offscreenrendering) return;
 
+#ifdef __EMSCRIPTEN__
+    // SDL invalidates its window surface whenever the browser canvas changes
+    // size.  Drawing into the cached surface would both miss the canvas and
+    // potentially use its obsolete dimensions.
+    if (SDL_Surface * const currentSurface = SDL_GetWindowSurface(sdl_window))
+        sdl_surface = currentSurface;
+
+    static bool wasmFirstFrameLogged;
+    bool logWasmFrame = false;
+    uint8_t sourceMin = 255, sourceMax = 0;
+    vec2_t const sourceRes = softsurface_getBufferResolution();
+    if (!wasmFirstFrameLogged)
+    {
+        uint8_t const * const source = softsurface_getBuffer();
+
+        if (source)
+        {
+            int32_t const sourcePixels = sourceRes.x * sourceRes.y;
+            int32_t const stride = max(1, sourcePixels / 4096);
+            for (int32_t i = 0; i < sourcePixels; i += stride)
+            {
+                sourceMin = min(sourceMin, source[i]);
+                sourceMax = max(sourceMax, source[i]);
+            }
+        }
+        logWasmFrame = sourceMin != sourceMax;
+    }
+#endif
+
     if (lockcount)
     {
         LOG_F(WARNING, "Frame was still locked at a depth of %d when videoShowFrame() was called!", lockcount);
@@ -2195,7 +2231,19 @@ void videoShowFrame(int32_t w)
     softsurface_blitBuffer((uint32_t*) sdl_surface->pixels, sdl_surface->format->BitsPerPixel);
     if (SDL_MUSTLOCK(sdl_surface)) SDL_UnlockSurface(sdl_surface);
 #if SDL_MAJOR_VERSION >= 2
-    if (SDL_UpdateWindowSurface(sdl_window))
+    int const updateResult = SDL_UpdateWindowSurface(sdl_window);
+#ifdef __EMSCRIPTEN__
+    if (logWasmFrame)
+    {
+        LOG_F(INFO,
+              "[NBlood WASM] First rendered frame presented: source=%dx%d range=%u..%u surface=%dx%d bpp=%d",
+              sourceRes.x, sourceRes.y, sourceMin, sourceMax,
+              sdl_surface ? sdl_surface->w : 0, sdl_surface ? sdl_surface->h : 0,
+              sdl_surface ? sdl_surface->format->BitsPerPixel : 0);
+        wasmFirstFrameLogged = updateResult == 0;
+    }
+#endif
+    if (updateResult)
     {
         // If a fullscreen X11 window is minimized then this may be required.
         // FIXME: What to do if this fails...

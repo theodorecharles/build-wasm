@@ -269,6 +269,9 @@ int SDLDrv_PCM_Init(int *mixrate, int *numchannels, void * initdata)
     }
 
     Initialised = 1;
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] SDL audio device opened: %d Hz, %d channel(s)", actual.freq, actual.channels);
+#endif
     return SDLErr_Ok;
 }
 

@@ -372,7 +372,11 @@ defined __x86_64__ || defined __amd64__ || defined _M_X64 || defined _M_IA64 || 
 
 #endif
 
-#if defined(__linux)
+#if defined(__EMSCRIPTEN__)
+# define B_LITTLE_ENDIAN 1
+# define B_BIG_ENDIAN    0
+
+#elif defined(__linux)
 # include <endian.h>
 # if __BYTE_ORDER == __LITTLE_ENDIAN || __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 #  define B_LITTLE_ENDIAN 1

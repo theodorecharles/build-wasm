@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Blood — WebAssembly</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      background: #080606;
+      color: #d8ceca;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    main { width: min(100%, 1040px); padding: 20px; text-align: center; }
+    h1 { margin: 0 0 14px; color: #9d1717; font-size: clamp(30px, 6vw, 58px); letter-spacing: .18em; }
+    #frame { position: relative; border: 1px solid #4a1717; background: #000; box-shadow: 0 0 32px #260000; }
+    canvas { display: block; width: 100%; aspect-ratio: 16 / 10; background: #000; outline: 0; image-rendering: pixelated; }
+    #status {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #050303e8;
+      color: #c8b9b4;
+      white-space: pre-line;
+    }
+    #status.ready { pointer-events: none; opacity: 0; transition: opacity 250ms ease; }
+    p { margin: 12px 0 0; color: #8f7d78; font-size: 13px; }
+    button { margin-top: 10px; border: 1px solid #6c2525; background: #1b0c0c; color: #d8ceca; padding: 7px 12px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Blood</h1>
+    <div id="frame">
+      <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+      <div id="status">Loading Blood WebAssembly…</div>
+    </div>
+    <button id="fullscreen" type="button">Fullscreen</button>
+    <p>Click the game canvas to focus and capture the mouse. Press Esc to release it.</p>
+  </main>
+  <script>
+    const canvas = document.getElementById('canvas');
+    const frame = document.getElementById('frame');
+    const statusElement = document.getElementById('status');
+    window.__bloodWasmStatus = { audioState: 'not-created', pointerLocked: false };
+
+    canvas.addEventListener('click', () => {
+      canvas.focus();
+      const audioContext = Module?.SDL2?.audioContext;
+      if (audioContext) {
+        window.__bloodWasmStatus.audioState = audioContext.state;
+        const resume = audioContext.state === 'running' ? Promise.resolve() : audioContext.resume();
+        resume.then(() => {
+          window.__bloodWasmStatus.audioState = audioContext.state;
+          console.info(`[NBlood WASM] Web Audio context is ${audioContext.state}`);
+        });
+      }
+      if (document.pointerLockElement !== canvas) canvas.requestPointerLock?.();
+    });
+    document.addEventListener('pointerlockchange', () => {
+      window.__bloodWasmStatus.pointerLocked = document.pointerLockElement === canvas;
+      console.info(`[NBlood WASM] Pointer lock ${window.__bloodWasmStatus.pointerLocked ? 'acquired' : 'released'}`);
+    });
+    document.addEventListener('pointerlockerror', () => {
+      console.warn('[NBlood WASM] Pointer lock request was rejected by the browser');
+    });
+    document.getElementById('fullscreen').addEventListener('click', () => frame.requestFullscreen?.());
+
+    const launchArguments = ['-game_dir=/game', '-quick', '-nodemo', '-noautoload', '-nosetup'];
+    if (new URLSearchParams(location.search).get('autostart') === '1') {
+      launchArguments.push('-map=E1M1.MAP');
+      console.info('[NBlood WASM] Autostarting E1M1 for browser verification');
+    }
+
+    var Module = {
+      arguments: launchArguments,
+      canvas,
+      preRun: [() => {
+        console.info('[NBlood WASM] Preparing game data mount at /game');
+      }],
+      print: (...args) => console.log(...args),
+      printErr: (...args) => console.error(...args),
+      setStatus: (text) => {
+        if (!text) statusElement.classList.add('ready');
+        else statusElement.textContent = text;
+      },
+      monitorRunDependencies: (remaining) => {
+        if (remaining) statusElement.textContent = `Loading Blood data… (${remaining} remaining)`;
+      },
+      onRuntimeInitialized: () => {
+        statusElement.classList.add('ready');
+        console.info('[NBlood WASM] WebAssembly runtime initialized');
+      },
+      onAbort: (reason) => {
+        statusElement.classList.remove('ready');
+        statusElement.textContent = `Blood stopped:\n${reason}`;
+      }
+    };
+
+    window.addEventListener('error', (event) => {
+      statusElement.classList.remove('ready');
+      statusElement.textContent = `Browser error:\n${event.message}`;
+    });
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

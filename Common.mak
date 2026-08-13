@@ -998,7 +998,7 @@ else ifeq ($(SUBPLATFORM),LINUX)
     LIBS += -lrt -latomic
 endif
 
-ifeq (,$(filter $(PLATFORM),WINDOWS WII))
+ifeq (,$(filter $(PLATFORM),WINDOWS WII EMSCRIPTEN))
     ifneq ($(PLATFORM),BSD)
         LIBS += -ldl
     endif

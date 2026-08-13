@@ -885,6 +885,14 @@ void maybe_redirect_outputs(void)
 
 int engineFPSLimit(bool const throttle)
 {
+#ifdef __EMSCRIPTEN__
+    // emscripten_set_main_loop() already schedules one callback per browser
+    // animation frame.  Applying the desktop limiter a second time can stall
+    // rendering when the virtual display has no reliable refresh metadata.
+    (void) throttle;
+    g_frameDelay = 0;
+    return true;
+#else
     static uint64_t lastFrameTicks;
     static uint64_t lastDelay;
 
@@ -908,4 +916,5 @@ int engineFPSLimit(bool const throttle)
     }
 
     return false;
+#endif
 }

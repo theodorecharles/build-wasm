@@ -72,6 +72,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "nnexts.h"
 #endif
 
+#ifdef __EMSCRIPTEN__
+# include <emscripten.h>
+#endif
+
 #ifdef _WIN32
 # include <shellapi.h>
 # define UPDATEINTERVAL 604800 // 1w
@@ -605,6 +609,9 @@ int16_t startang, startsectnum;
 
 void StartLevel(GAMEOPTIONS *pOpt)
 {
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Starting level %s", pOpt->zLevelName);
+#endif
     EndLevel();
     gInput = {};
     gStartNewGame = 0;
@@ -818,6 +825,9 @@ void StartLevel(GAMEOPTIONS *pOpt)
     gPaused = 0;
     gGameStarted = 1;
     ready2send = 1;
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Level loaded and playable: %s", pOpt->zLevelName);
+#endif
 }
 
 void StartNetworkLevel(void)
@@ -1656,6 +1666,9 @@ int app_main(int argc, char const * const * argv)
     wm_setapptitle(APPNAME);
 
     LOG_F(INFO, APPNAME " %s", s_buildRev);
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Engine initialization started");
+#endif
     PrintBuildInfo();
 
     memcpy(&gGameOptions, &gSingleGameOptions, sizeof(GAMEOPTIONS));
@@ -1738,6 +1751,9 @@ int app_main(int argc, char const * const * argv)
 #ifdef USE_QHEAP
     Resource::heap = new QHeap(nMaxAlloc);
 #endif
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Loading Blood resources from the virtual filesystem");
+#endif
     gSysRes.Init(pUserRFF ? pUserRFF : "BLOOD.RFF");
     gGuiRes.Init("GUI.RFF");
     gSoundRes.Init(pUserSoundRFF ? pUserSoundRFF : "SOUNDS.RFF");
@@ -1745,6 +1761,9 @@ int app_main(int argc, char const * const * argv)
     HookReplaceFunctions();
 
     LOG_F(INFO, "Initializing Build 3D engine");
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Initializing SDL browser renderer");
+#endif
     scrInit();
 
     LOG_F(INFO, "Creating standard color lookups");
@@ -1840,6 +1859,9 @@ int app_main(int argc, char const * const * argv)
     viewResizeView(gViewSize);
     vsync = videoSetVsync(vsync);
     LOG_F(INFO, "Initializing sound system");
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Initializing Web Audio through SDL");
+#endif
     sndInit();
     sfxInit();
     gChoke.Init(518, playerHandChoke);
@@ -1899,8 +1921,22 @@ RESTART:
     }
     ready2send = 1;
     static bool frameJustDrawn;
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Starting browser game loop");
+    emscripten_set_main_loop([]()
+#else
     while (!gQuitGame)
+#endif
     {
+#ifdef __EMSCRIPTEN__
+        if (gQuitGame)
+        {
+            LOG_F(INFO, "[NBlood WASM] Browser game loop stopped");
+            emscripten_cancel_main_loop();
+            ShutDown();
+            return;
+        }
+#endif
         bool bDraw;
         if (gGameStarted)
         {
@@ -1996,7 +2032,11 @@ RESTART:
                 break;
             }
             if (gQuitGame)
+#ifdef __EMSCRIPTEN__
+                return;
+#else
                 continue;
+#endif
 
             OSD_DispatchQueued();
 
@@ -2061,6 +2101,9 @@ RESTART:
         if (gStartNewGame)
             StartLevel(&gGameOptions);
     }
+#ifdef __EMSCRIPTEN__
+    , 0, true);
+#endif
     ready2send = 0;
     if (gDemo.at0)
         gDemo.Close();

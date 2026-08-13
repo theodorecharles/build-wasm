@@ -1,6 +1,10 @@
 # NBlood / Rednukem / PCExhumed
 Reverse-engineered ports of Build games using EDuke32 engine technology and development principles
 
+## WebAssembly port
+
+This fork includes a playable single-player NBlood browser target. See [WEB_BUILD.md](WEB_BUILD.md) for asset staging, Emscripten build, local serving, and current browser limitations. Original Blood game data is required locally and is intentionally excluded from git.
+
 ## NBlood
 Blood port based on EDuke32.
 

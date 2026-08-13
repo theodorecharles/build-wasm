@@ -125,6 +125,9 @@ char *Bgethomedir(void)
     if (drv)
         drv[1] = '\0';
     return Xstrdup(cwd);
+#elif defined(__EMSCRIPTEN__)
+    char const *e = getenv("HOME");
+    return Xstrdup(e != NULL && e[0] != '\0' ? e : "/");
 #else
     char const *e;
     if ((e = getenv("HOME")) == NULL || e[0] == '\0')
@@ -153,6 +156,8 @@ char *Bgetappdir(void)
 
 #elif defined EDUKE32_OSX
     dir = osx_getappdir();
+#elif defined __EMSCRIPTEN__
+    dir = Xstrdup("/");
 #elif defined __FreeBSD__
     // the sysctl should also work when /proc/ is not mounted (which seems to
     // be common on FreeBSD), so use it..

@@ -1,5 +1,11 @@
 
 obj/
+/build-web/
+/web/assets/
+/nblood.html
+/nblood.js
+/nblood.wasm
+/nblood.data
 
 /eduke32
 /mapster32
