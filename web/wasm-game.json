@@ -1,0 +1,28 @@
+{
+  "id": "blood",
+  "title": "Blood",
+  "kicker": "Build Engine",
+  "description": "Play classic Blood with your legally owned One Unit Whole Blood data.",
+  "loadingTitle": "Starting Blood…",
+  "icon": "/blood.ico",
+  "iconPixelated": true,
+  "adapter": "/game-adapter.js",
+  "displayMode": "4:3",
+  "canvasWidth": 800,
+  "canvasHeight": 600,
+  "pixelated": true,
+  "syncBackbuffer": false,
+  "pointerLock": true,
+  "identity": false,
+  "advanced": false,
+  "graphics": false,
+  "preferencesNamespace": "blood-classic",
+  "provisioningText": "Install the required files from your legally owned One Unit Whole Blood folder. Optional Cryptic Passage, movies, demos, and OGG tracks are accepted when selected together.",
+  "theme": {
+    "accent": "#9d1717",
+    "accent-strong": "#ed5555",
+    "border": "#651d1d",
+    "panel": "rgb(18 7 7 / 96%)",
+    "field": "#190a0a"
+  }
+}

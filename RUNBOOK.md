@@ -1,155 +1,138 @@
 # Blood WASM downstream runbook
 
-This repository is the downstream `theodorecharles/blood-wasm` port of NBlood.
-It is maintained for the portfolio in `/home/ted/Development/wasm/RUNBOOK.md`.
-The downstream branch is `devel`; `master` is the stable downstream branch when
-it is promoted. The `upstream` remote is read-only reference material.
+This repository is the downstream native-source NBlood browser port. Work stays
+on downstream branches; do not push, file issues, or otherwise contact the
+upstream project. No existing third-party WebAssembly port is used.
 
-## Non-negotiable boundaries
+## Legal and data boundary
 
-- Keep all implementation, branches, tags, and releases in
-  `theodorecharles/blood-wasm`.
-- Never push to NBlood upstream or open upstream pull requests, issues,
-  discussions, comments, or other maintainer contact.
-- Blood retail data is user-owned. It must stay ignored and outside Git, Docker
-  layers, exported images, and public artifacts.
-- Retail files are selected locally and persisted in the user's private browser
-  Cache Storage. They must never be uploaded to this server. All HTTP `PUT`
-  requests are rejected and `/data/*` is not exposed by the public image.
-- `nblood.pk3` is the tracked downstream resource pack used by the port. It is
-  not a Blood retail data substitute and must remain separately reviewed from
-  the proprietary files staged by `setup-assets.sh`.
+Blood retail data is owner-supplied and must stay outside Git, image layers,
+and public static artifacts. The tracked `nblood.pk3` is an engine resource,
+not retail game data. The framework server validates the exact
+`wasm-game-data.json` allowlist into persistent `/data` and exposes only valid
+keys after the 24-file required set is complete. Browser downloads are cached
+in origin-private IndexedDB and restored without another container transfer.
 
-## Current baseline
+Optional entries do not block readiness. Selecting a complete installation on
+first setup also accepts the 33 allowlisted optional demo, Cryptic Passage,
+movie, and OGG files. The classic game remains playable with only the required
+set.
 
-The starting downstream checkpoint is `f398fa63a`, `feat: add playable NBlood
-WebAssembly port`, based on NBlood `f86390315`. The inherited browser work
-already includes:
-
-- SDL2 software rendering in a single-threaded Emscripten build;
-- Web Audio through SDL2 and OGG CD-audio replacements when supplied;
-- Asyncify around browser-hostile cutscene/fade waits;
-- a user-gesture launch overlay with optional Cryptic Passage, intro movies,
-  and demo playback;
-- IndexedDB-backed configuration and saves;
-- ignored local retail-data staging through `setup-assets.sh`.
-
-The browser build was reproduced on 2026-08-14 with Emscripten 6.0.6 using
-`./build-web.sh`. The earlier ignored build preloaded retail data; the current
-assetless build replaces that with validated, browser-local ingestion.
-
-## Required Blood data
-
-The browser launcher lists and validates these required files from the user's
-legal local installation:
+## Architecture and current state
 
 ```text
-BLOOD.INI
-BLOOD.RFF
-GUI.RFF
-SOUNDS.RFF
-SURFACE.DAT
-VOXEL.DAT
-TILES000.ART through TILES017.ART
+wasm-game-framework 0.5.1 canonical document/server
+        ↓
+Blood wasm-game.json + game-adapter.js
+        ↓
+container /data → exact validation → browser IndexedDB
+        ↓
+traversal-safe preservePaths MEMFS mount at /game
+        ↓
+native NBlood + Build software renderer + SDL2/Web Audio
 ```
 
-Optional files are accepted into the same browser-local cache when present:
+The downstream owns no HTML or CSS. The fixed classic backbuffer is 800×600
+and the framework contains it as 4:3 without stretching. Native state reports
+menu/gameplay/paused, so capture occurs only in gameplay and losing pointer
+lock opens the native menu. Configuration and saves remain under NBlood's
+normal IDBFS-backed user directory.
 
-```text
-BLOOD000.DEM through BLOOD003.DEM
-CP01.MAP through CP09.MAP
-CPART07.AR_, CPART15.AR_
-CPBB01.MAP through CPBB04.MAP, CPSL.MAP
-CRYPTIC.INI, CRYPTIC.SMK, CRYPTIC.WAV
-LOGO.SMK, GTI.SMK
-blood02.ogg through blood09.ogg
-movie/**
-```
+The browser classic control contract is applied after persisted setup loads:
+WASD movement, mouse enabled, horizontal mouse turning, and no vertical look.
+Mouse Y retains classic forward/back behavior. Native telemetry exposes this
+as mask `31`.
 
-The user can drop the Blood installation directory onto the launcher or use
-the directory picker. The launcher maps recognized files to exact destinations,
-checks the Steam release's sizes plus RFF signatures, reports every missing or
-invalid required file, and enables **Play Blood** only after the set is stored
-locally and loaded into the Emscripten runtime filesystem.
+## Exact owner-data contract
 
-`setup-assets.sh` remains a local native-development helper. It may copy files
-from a legally installed Blood directory into ignored `web/assets/`; it must
-never be used as a Docker build input or checked-in release artifact.
+The manifest contains 57 exact size/SHA-256 entries:
 
-## Build and local runtime
+- 24 required: `BLOOD.INI`, three RFF files, `SURFACE.DAT`, `VOXEL.DAT`, and
+  `TILES000.ART` through `TILES017.ART`.
+- 33 optional: four demos, Cryptic Passage maps/resources, startup movies, and
+  `blood02.ogg` through `blood09.ogg`.
 
-Activate Emscripten first or set `$EMSDK_DIR` to an emsdk checkout:
+RFF entries additionally validate the `RFF\x1a` signature. Optional entries
+use framework `required:false` semantics and are skipped cleanly when absent.
+
+## Build and static verification
 
 ```bash
-./build-web.sh
+EMSDK_DIR=/home/ted/emsdk ./scripts/test-web.sh
+```
+
+Expected ignored output:
+
+```text
+build-web/dist/blood.js
+build-web/dist/blood.wasm
+build-web/dist/blood.data       # tracked nblood.pk3 only
+build-web/dist/blood.ico
+build-web/dist/wasm-game.json
+build-web/dist/wasm-game-data.json
+build-web/dist/game-adapter.js
+build-web/dist/shared-shell/*
+```
+
+The test validates the WASM/JavaScript, exact framework 0.5.1 package copies,
+manifest counts and digests, absence of downstream HTML, native classic input
+seams, fixed 4:3 dimensions, and absence of retail files or names in the
+preload bundle.
+
+## Run
+
+Local framework server:
+
+```bash
 ./serve-web.sh 8007
 ```
 
-The build emits `build-web/dist/index.html`, `index.js`, `index.wasm`, the
-small non-retail preload bundle, and `data-ingest.js`. The local server serves
-only that assetless bundle and rejects writes. Chromium tests provide Steam
-files through the directory picker; no server-side data directory is needed.
-The optional `BLOOD_DEV_DATA_ROOT` automation helper is hard-limited to a
-loopback bind; `tools/serve-web.py` refuses to expose it on a non-loopback
-address.
-
-The page must remain useful with an empty data directory: the WASM runtime can
-initialize, the file list remains visible, and the page explains how to supply
-the files. Do not auto-start the game or claim a playable level until the
-required data has been loaded.
-
-## Docker contract
-
-The image is a `linux/amd64` assetless browser checkpoint built reproducibly in
-a pinned Emscripten stage and served by Nginx. It serves TCP 8088, exposes
-`/health`, rejects non-GET/HEAD requests, and contains no retail files. A
-typical smoke test is:
+Framework-backed container:
 
 ```bash
-docker build --build-arg VCS_REF=$(git rev-parse HEAD) \
-  -t theodorecharles/blood-wasm:dev .
-docker run --rm --name blood-wasm-test -p 8007:8088 \
-  theodorecharles/blood-wasm:dev
+EMSDK_DIR=/home/ted/emsdk ./scripts/build-image.sh blood-wasm:dev
+docker run --rm -p 127.0.0.1:8007:8088 -v blood-data:/data blood-wasm:dev
 ```
 
-Verify `/health`, an empty-data browser state, `PUT` returning 403/405, and
-`/data/<file>` returning 404. Then use Chromium's local file chooser to prove
-browser-local persistence without adding retail files to the container.
+Open `http://127.0.0.1:8007/`. Do not use `file:` or a plain static server;
+the framework document and provisioning endpoints are part of the runtime.
 
-## Milestone ladder
+Useful query-driven checks:
 
-1. Source/legal baseline: downstream branch, GPL/copyright collateral, and
-   ignored retail staging are documented.
-2. Substantial Emscripten compile: NBlood game and engine objects link to a
-   real WASM artifact.
-3. Assetless browser artifact: the launcher and WASM load without retail data.
-4. Data ingestion: required files are listed, validated, persisted only in the
-   browser, and loaded into `/game` without an HTTP upload.
-5. Engine initialization: SDL video/audio and the authentic NBlood startup
-   path produce actionable browser logs.
-6. Authentic menu: the Blood menu renders with keyboard/mouse focus and
-   pointer-lock transitions.
-7. Single-player level: E1M1 starts, renders, accepts input, and saves/loads.
-8. Campaign coverage: Cryptic Passage and optional movies/demos are tested
-   when the owner supplies their files.
-9. Multiplayer: investigate a browser-safe network boundary separately; the
-   current port is single-player only.
-10. Docker release: a clean image is built and smoke-tested with no retail
-    files in exported layers.
+- `?autostart=1`: E1M1.
+- `?autostart=1&campaign=cryptic`: CP01, with optional Cryptic data installed.
+- `?intro=1`: installed startup movies.
+- `?demos=1`: installed attract demos.
 
-Do not promote a milestone based on a build exit code alone. Record the exact
-command, artifact sizes, browser URL, data volume, visible result, and console
-logs in the checkpoint commit or its test notes.
+## Serialized browser smoke
 
-## Focused checkpoint convention
+1. Confirm incomplete `/data` shows provisioning only; once complete, setup is
+   hidden and Play is available.
+2. Start with the 24 required files and verify the native menu renders at 4:3.
+3. Start E1M1; verify WASD, horizontal mouse turn, classic mouse-Y movement,
+   fire/use/jump, audio, Escape, capture loss, and return to gameplay.
+4. Hard refresh and confirm no `/game-data/files/*` transfers on an IndexedDB
+   cache hit.
+5. Change a setting and create a save, reload, and verify IDBFS persistence.
+6. With optional data provisioned, verify Cryptic Passage, movies, demos, and
+   OGG playback independently.
 
-Use small downstream commits such as:
+Chrome is intentionally not started from unsynchronized test lanes.
 
-```text
-docs: add Blood downstream runbook
-feat: add browser Blood data ingestion
-build: publish assetless Blood container checkpoint
-```
+## Modernized native profile
 
-Push only the downstream `devel` branch. Keep Docker tags local until the
-portfolio owner explicitly authorizes publication to Docker Hub.
+A separate Polymost/WebGL 2 profile is feasible from this native source. The
+compile probe reached GLES code, then stopped at incomplete feature guards for
+`r_detailmapping`, `r_glowmapping`, and `voxvboalloc`. Treat this as medium
+native-port work: create a reusable Build-engine GLES abstraction suitable for
+both Blood and a future Duke port, finish renderer/input/aspect review, and
+ship it as a distinct dynamic-resolution profile. Do not replace or silently
+alter the verified classic profile.
+
+## Remaining work
+
+1. Run the serialized physical Chrome capture/audio/save checklist against the
+   canonical 0.5.1 image.
+2. Implement and test the shared Build-engine GLES adapter before advertising
+   a modernized renderer profile.
+3. Add a reviewed browser network transport before claiming remote multiplayer.

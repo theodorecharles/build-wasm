@@ -178,6 +178,11 @@ void ctrlGetInput(void)
 
     CONTROL_ProcessBinds();
 
+#ifdef __EMSCRIPTEN__
+    // Classic Blood uses horizontal mouse turning.  Keep vertical movement in
+    // its original forward/back role and never convert it into pitch.
+    gMouseAim = 0;
+#else
     if (gMouseAiming)
         gMouseAim = 0;
 
@@ -204,6 +209,7 @@ void ctrlGetInput(void)
     }
     else if (gMouseAiming)
         gInput.keyFlags.lookCenter = 1;
+#endif
 
     CONTROL_GetInput(&info);
 

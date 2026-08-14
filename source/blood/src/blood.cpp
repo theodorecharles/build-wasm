@@ -104,6 +104,34 @@ int32_t gNoSetup = 0, gCommandSetup = 0;
 
 INPUT_MODE gInputMode;
 
+#ifdef __EMSCRIPTEN__
+extern "C" EMSCRIPTEN_KEEPALIVE int NBlood_WasmRuntimeState(void)
+{
+    if (!gGameStarted || gGameMenuMgr.m_bActive || gInputMode != INPUT_MODE_0)
+        return 0;
+    if (gPaused)
+        return 2;
+    return 1;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void NBlood_WasmEnsureMenu(void)
+{
+    if (gGameStarted && !gGameMenuMgr.m_bActive)
+        KB_KeyDown[sc_Escape] = 1;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int NBlood_WasmControlsMask(void)
+{
+    int mask = 0;
+    if (KeyboardKeys[gamefunc_Move_Forward][0] == sc_W) mask |= 1;
+    if (KeyboardKeys[gamefunc_Move_Backward][0] == sc_S) mask |= 2;
+    if (KeyboardKeys[gamefunc_Strafe_Left][0] == sc_A) mask |= 4;
+    if (KeyboardKeys[gamefunc_Strafe_Right][0] == sc_D) mask |= 8;
+    if (!gMouseAim) mask |= 16;
+    return mask;
+}
+#endif
+
 #ifdef USE_QHEAP
 unsigned int nMaxAlloc = 0x4000000;
 #endif
@@ -1738,6 +1766,16 @@ int app_main(int argc, char const * const * argv)
     int const readSetup =
 #endif
     CONFIG_ReadSetup();
+#ifdef __EMSCRIPTEN__
+    // The browser classic profile is a stable portfolio contract.  Apply it
+    // after persisted configuration is read so an older desktop layout cannot
+    // restore arrow-key movement or vertical mouse aim.
+    CONFIG_SetDefaultKeys(keydefaults);
+    gSetup.usemouse = 1;
+    gMouseAim = 0;
+    gSetup.xdim = 800;
+    gSetup.ydim = 600;
+#endif
     if (bCustomName)
         strcpy(szPlayerName, gPName);
 
@@ -2032,7 +2070,8 @@ RESTART:
                                     diagnostics.playerPosition[3] = $3;
                                     document.documentElement.dataset.simulationFrames = String(diagnostics.simulationFrames);
                                     document.documentElement.dataset.playerPosition = String($0) + ',' + String($1) + ',' + String($2) + ',' + String($3);
-                                }, gMe->pSprite->x, gMe->pSprite->y, gMe->pSprite->z, gMe->pSprite->ang);
+                                }, TrackerCast(gMe->pSprite->x), TrackerCast(gMe->pSprite->y),
+                                   TrackerCast(gMe->pSprite->z), TrackerCast(gMe->pSprite->ang));
                             }
 #endif
                         }

@@ -16,13 +16,17 @@ fi
 
 mkdir -p "$dist_dir"
 
-# The link output is regenerated so changes to the shell or preloaded game data
-# cannot leave a stale .data bundle while preserving the expensive object build.
+# The link output is regenerated so changes to the non-retail engine resource
+# cannot leave a stale preload bundle while preserving the object build.
 rm -f \
     "$dist_dir/index.data" \
     "$dist_dir/index.html" \
     "$dist_dir/index.js" \
-    "$dist_dir/index.wasm"
+    "$dist_dir/index.wasm" \
+    "$dist_dir/data-ingest.js" \
+    "$dist_dir/blood.data" \
+    "$dist_dir/blood.js" \
+    "$dist_dir/blood.wasm"
 
 common_flags=(
     -Wno-unsupported-floating-point-opt
@@ -40,7 +44,6 @@ link_flags=(
     -sEXIT_RUNTIME=0
     -sEXPORTED_RUNTIME_METHODS=callMain,FS,addRunDependency,removeRunDependency
     -sSTACK_SIZE=1MB
-    --shell-file "$repo_dir/web/shell.html"
     --preload-file "$repo_dir/nblood.pk3@/game/nblood.pk3"
     -lidbfs.js
 )
@@ -61,9 +64,9 @@ make -C "$repo_dir" -f GNUmakefile -j"$(nproc)" blood \
     RANLIB=emranlib \
     STRIP= \
     SDLCONFIG= \
-    EXESUFFIX=.html \
+    EXESUFFIX=.js \
     obj=build-web/obj \
-    blood_game=build-web/dist/index \
+    blood_game=build-web/dist/blood \
     NETCODE=0 \
     STARTUP_WINDOW=0 \
     USE_OPENGL=0 \
@@ -79,6 +82,15 @@ make -C "$repo_dir" -f GNUmakefile -j"$(nproc)" blood \
     CFLAGS="-sUSE_SDL=2" \
     LDFLAGS="${link_flags[*]}"
 
-printf '[NBlood WASM] Browser build ready: %s\n' "$dist_dir/index.html"
-cp -f "$repo_dir/web/data-ingest.js" "$dist_dir/data-ingest.js"
-printf '[NBlood WASM] Browser data-ingest module copied to %s/data-ingest.js\n' "$dist_dir"
+printf '[NBlood WASM] Framework-ready engine build: %s/blood.js\n' "$dist_dir"
+cp -f "$repo_dir/web/game-adapter.js" "$dist_dir/game-adapter.js"
+cp -f "$repo_dir/web/wasm-game.json" "$dist_dir/wasm-game.json"
+cp -f "$repo_dir/web/wasm-game-data.json" "$dist_dir/wasm-game-data.json"
+cp -f "$repo_dir/source/blood/rsrc/game_icon.ico" "$dist_dir/blood.ico"
+
+framework_dir="${WASM_FRAMEWORK_DIR:-$repo_dir/../wasm-game-framework}"
+if [[ ! -x "$framework_dir/scripts/install-browser-package.sh" ]]; then
+    printf 'WASM framework browser package not found at %s\n' "$framework_dir" >&2
+    exit 1
+fi
+"$framework_dir/scripts/install-browser-package.sh" "$dist_dir/shared-shell" copy

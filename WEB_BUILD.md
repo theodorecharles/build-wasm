@@ -1,59 +1,77 @@
 # NBlood WebAssembly build
 
-This branch builds NBlood for a single-threaded browser runtime using Emscripten's SDL2 port. It selects the classic software renderer, maps SDL video to a 960×600 browser canvas, maps SDL audio to Web Audio, schedules the native game loop with `emscripten_set_main_loop`, and cooperatively yields from native cutscene/fade waits with Asyncify.
+This branch builds native-source NBlood for a single-threaded Emscripten
+runtime. The current `classic` browser profile uses SDL2, the 8-bit software
+renderer, a fixed 800×600 4:3 backbuffer, SDL/Web Audio, and Asyncify around
+the remaining browser-hostile cutscene and fade waits.
 
-## Game data
+The downstream does not own an HTML document or CSS shell. It emits
+`wasm-game.json`, `game-adapter.js`, the exact owner-data manifest, the native
+engine artifacts, and an authentic tracked icon. wasm-game-framework 0.5.1
+owns the canonical launcher/loading/runtime document and container server.
 
-The build requires a legal Blood 1.21 installation. The staging script checks the common Linux Steam library locations for `One Unit Whole Blood`.
+## Owner data
 
-Stage the required files with:
+Blood retail files must never be committed, copied into the image, or exposed
+as arbitrary static files. `wasm-game-data.json` is the exact allowlist for One
+Unit Whole Blood: 24 required base files plus 33 optional demo, Cryptic Passage,
+movie, and OGG files. The framework validates uploads into persistent `/data`;
+each browser then downloads each valid file once and caches it in origin-private
+IndexedDB.
+
+`setup-assets.sh` remains an optional local native-development helper. It may
+copy a legal installation into ignored `web/assets/`, but the browser build
+never reads that directory.
+
+## Build, verify, and run
+
+Set `EMSDK_DIR` when Emscripten is not already active:
 
 ```bash
-./setup-assets.sh
+EMSDK_DIR=/home/ted/emsdk ./scripts/test-web.sh
+./serve-web.sh 8007
 ```
 
-To use a different installation:
+The local server uses `build-web/container-data` as its persistent provisioning
+directory by default. Override it with `BLOOD_CONTAINER_DATA_ROOT`.
+
+For a container image:
 
 ```bash
-./setup-assets.sh /path/to/Blood
+EMSDK_DIR=/home/ted/emsdk ./scripts/build-image.sh blood-wasm:dev
+docker run --rm -p 127.0.0.1:8007:8088 -v blood-data:/data blood-wasm:dev
 ```
 
-You can also set `BLOOD_STEAM_DIR` to that directory.
+Open <http://127.0.0.1:8007/> and provision the legal installation folder once.
+The default launch uses `-quick -nodemo -noautoload -nosetup`. Optional launch
+parameters remain available for deterministic checks:
 
-The helper copies `BLOOD.INI`, the three RFF files, `SURFACE.DAT`, `VOXEL.DAT`, and `TILES000.ART` through `TILES017.ART` into ignored `web/assets/` for local native inspection. When present, it also stages the retail demos, Cryptic Passage files, `LOGO.SMK`/`GTI.SMK` cutscenes, the complete `movie/` directory, and `blood02.ogg` through `blood09.ogg` CD-audio replacements. Never commit or redistribute those files.
+- `?autostart=1` starts E1M1.
+- `?autostart=1&campaign=cryptic` starts CP01 when Cryptic data is installed.
+- `?intro=1` enables installed startup movies.
+- `?demos=1` enables installed attract demos.
 
-The public browser build does not preload `web/assets/`. The launcher lists the required files and accepts a directory drop or picker selection, validates them, and persists them only in the user's private browser cache. It never uploads retail files to the web server. Only after the required set is present does it write the files into the Emscripten `/game` filesystem.
+Configuration and saves under `/home/web_user/.config/nblood` are restored and
+automatically synchronized through IDBFS.
 
-## Build and run
+## Browser profile
 
-Emscripten is expected at `$HOME/emsdk` by default. Set `EMSDK_DIR` if it lives elsewhere.
+- Classic 8-bit software renderer at 800×600, contained as 4:3 with no stretch.
+- WASD defaults are reapplied after persisted configuration loads.
+- Mouse X turns; classic mouse Y moves forward/back. Vertical mouse look is
+  deliberately disabled for this profile.
+- Pointer lock is allowed only during gameplay. Losing capture opens the native
+  menu; menu/paused state releases capture.
+- SDL stereo and optional owner-supplied OGG music use Web Audio.
+- Single player and loopback only; remote networking is not implemented.
 
-```bash
-./build-web.sh
-./serve-web.sh
-```
+## Modernized renderer feasibility
 
-Then open <http://127.0.0.1:8000/> in Chrome. Drop or choose the Blood installation folder, then click **Play Blood** once the required list is complete. The click starts the game and unlocks audio without capturing the pointer in the menu. Gameplay canvas clicks capture the pointer; engine menus release it. The browser build is emitted to `build-web/dist/`, including the non-retail `data-ingest.js` module; serve it over HTTP rather than opening the HTML file directly.
-
-For a direct E1M1 smoke test, open <http://127.0.0.1:8000/?autostart=1>.
-
-For a direct Cryptic Passage CP01 smoke test, open <http://127.0.0.1:8000/?autostart=1&campaign=cryptic>.
-
-When Cryptic Passage files are available, the start overlay offers a campaign selector. It can also be preselected with <http://127.0.0.1:8000/?campaign=cryptic>.
-
-When the retail logo movies are available, the overlay also offers the original startup sequence. It can be preselected with <http://127.0.0.1:8000/?intro=1>.
-
-When the retail demos are available, the overlay offers the original attract-mode playback. It can be preselected with <http://127.0.0.1:8000/?demos=1>.
-
-The launch page starts with `-quick -nodemo -noautoload -nosetup` by default and mounts the staged game files at `/game`. Configuration and saves under `/home/web_user/.config/nblood` are loaded from and automatically synchronized to IndexedDB. Settings are flushed when a menu closes and when the page is hidden.
-
-## Current browser scope
-
-- Single-player NBlood with the classic 8-bit software renderer
-- Keyboard and mouse input through SDL2
-- SDL stereo output through Web Audio; the **Play Blood** click resumes the browser audio context
-- OGG CD-audio replacements through Emscripten's Vorbis port, enabled by default with automatic MIDI fallback
-- Retail Smacker cutscenes when the matching legal files are available
-- DOM fullscreen button with pixelated scaling from the 960×600 internal canvas
-- IndexedDB-backed settings and save games under NBlood's normal per-user configuration directory
-- No networking or OpenGL renderer yet
+The native source includes Polymost and extensive GLES conditionals, so a
+separate modernized WebGL 2 profile is feasible without borrowing another WASM
+port. A compile probe reached the renderer but exposed incomplete GLES feature
+gates in `menu.cpp` (`r_detailmapping`, `r_glowmapping`) and `tile.cpp`
+(`voxvboalloc`). This is medium-sized native adaptation work, not a safe flag
+flip. It should be implemented as a reviewed Build-engine GLES adapter shared
+with a future Duke browser port, then exposed as a distinct dynamic-resolution
+profile. The verified classic profile remains software-rendered.

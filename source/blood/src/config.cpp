@@ -250,10 +250,10 @@ void CONFIG_SetDefaults(void)
     scripthandle = -1;
 
 #ifdef __EMSCRIPTEN__
-    // Keep the software renderer at a predictable internal resolution.  CSS
-    // scales the canvas to the page or fullscreen element without making the
-    // game redraw every pixel in the browser viewport.
-    gSetup.xdim = 960;
+    // Keep the classic software renderer at a predictable 4:3 internal
+    // resolution. The shared browser shell contains this buffer without
+    // stretching it or making the game redraw every viewport pixel.
+    gSetup.xdim = 800;
     gSetup.ydim = 600;
 #elif defined __ANDROID__
     droidinput.forward_sens = 5.f;
