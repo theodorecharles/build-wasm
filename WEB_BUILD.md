@@ -7,7 +7,7 @@ the remaining browser-hostile cutscene and fade waits.
 
 The downstream does not own an HTML document or CSS shell. It emits
 `wasm-game.json`, `game-adapter.js`, the exact owner-data manifest, the native
-engine artifacts, and an authentic tracked icon. wasm-game-framework 0.5.1
+engine artifacts, and an authentic tracked icon. wasm-game-framework 0.5.2
 owns the canonical launcher/loading/runtime document and container server.
 
 ## Owner data

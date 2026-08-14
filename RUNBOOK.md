@@ -21,7 +21,7 @@ set.
 ## Architecture and current state
 
 ```text
-wasm-game-framework 0.5.1 canonical document/server
+wasm-game-framework 0.5.2 canonical document/server
         ↓
 Blood wasm-game.json + game-adapter.js
         ↓
@@ -74,7 +74,7 @@ build-web/dist/game-adapter.js
 build-web/dist/shared-shell/*
 ```
 
-The test validates the WASM/JavaScript, exact framework 0.5.1 package copies,
+The test validates the WASM/JavaScript, exact framework 0.5.2 package copies,
 manifest counts and digests, absence of downstream HTML, native classic input
 seams, fixed 4:3 dimensions, and absence of retail files or names in the
 preload bundle.
@@ -132,7 +132,7 @@ alter the verified classic profile.
 ## Remaining work
 
 1. Run the serialized physical Chrome capture/audio/save checklist against the
-   canonical 0.5.1 image.
+   canonical 0.5.2 image.
 2. Implement and test the shared Build-engine GLES adapter before advertising
    a modernized renderer profile.
 3. Add a reviewed browser network transport before claiming remote multiplayer.
