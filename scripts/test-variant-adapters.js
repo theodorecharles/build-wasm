@@ -33,6 +33,7 @@ async function exercise(variant) {
   const calls = [];
   const transitions = [];
   const stateChanges = [];
+  const loading = [];
   const timers = [];
   let nativeState = 1;
   let now = 1000;
@@ -101,8 +102,17 @@ async function exercise(variant) {
       }
     },
     dataClient: {
-      async load(policy) {
+      async load(policy, options) {
         loadedPolicy = policy;
+        if (!isBlood) {
+          await assert.rejects(
+            policy.files[0].validate({ arrayBuffer: async () => new ArrayBuffer(0) }),
+            /failed SHA-256 verification/
+          );
+          options.onProgress({ phase: 'checking-cache', key: policy.files[0].key });
+          options.onProgress({ phase: 'downloading', key: policy.files[0].key, received: 1, total: 2 });
+          options.onProgress({ phase: 'restored', key: policy.files[0].key });
+        }
         return {
           policy,
           entries: policy.files.map(file => ({ cached: true, policy: { path: file.mountName } }))
@@ -110,7 +120,7 @@ async function exercise(variant) {
       }
     },
     shell: { resumeAudio() {}, engineState() { return transitions.at(-1) || 'launcher'; } },
-    setLoading() {}, log() {},
+    setLoading(...detail) { loading.push(detail); }, log() {},
     showRuntime(state) { transitions.push(state); },
     setEngineState(state, options) {
       transitions.push(state);
@@ -123,6 +133,12 @@ async function exercise(variant) {
   assert.equal(createdPolicy.namespace, dataManifest.variants[variant].namespace || dataManifest.namespace);
   await adapter.start(context);
   assert.equal(loadedPolicy, createdPolicy);
+  if (!isBlood) {
+    module.setStatus('Mounting owner data from cache');
+    module.monitorRunDependencies(1);
+    assert.doesNotMatch(loading.flat().join('\n'), /files?|data|cache|container|browser|mount|verif|directory|folder|path|engine/i,
+      'Duke normal loading copy must remain title-focused');
+  }
   assert.equal(adapter.readEngineState(), 'gameplay');
   assert.equal(transitions.at(-1), 'gameplay');
   assert.ok(calls.some(call => call[0] === 'mount'));

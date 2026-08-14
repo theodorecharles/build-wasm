@@ -61,9 +61,9 @@
         }],
         print: (...args) => { console.log('[Duke WASM]', ...args); ctx.log(args.join(' ')); },
         printErr: (...args) => { console.error('[Duke WASM]', ...args); ctx.log(`ERROR: ${args.join(' ')}`); },
-        setStatus: message => { if (message) ctx.setLoading(String(message)); },
+        setStatus: message => { if (message) ctx.setLoading('Preparing Duke Nukem 3D…'); },
         monitorRunDependencies: remaining => {
-          if (remaining) ctx.setLoading('Loading Duke Nukem 3D engine…', `${remaining} dependencies remaining`);
+          if (remaining) ctx.setLoading('Preparing Duke Nukem 3D…');
         },
         onRuntimeInitialized: () => resolve(engine),
         onAbort: reason => {
@@ -115,7 +115,7 @@
           mountName: spec.path,
           validateCached: false,
           validate: async file => {
-            ctx.setLoading(`Verifying ${spec.path}…`);
+            ctx.setLoading('Preparing Duke Nukem 3D…');
             if (await sha256Hex(file) !== spec.sha256) throw new Error(`${spec.path} failed SHA-256 verification.`);
           }
         }))
@@ -131,19 +131,19 @@
     async start(ctx) {
       if (started) return;
       void ctx.shell.resumeAudio();
-      ctx.setLoading('Restoring Duke Nukem 3D data…', '', 5);
+      ctx.setLoading('Preparing Duke Nukem 3D…', '', 5);
       const data = await ctx.dataClient.load(ownerData, {
         onProgress(detail) {
-          if (detail.phase === 'checking-cache') ctx.setLoading(`Checking ${detail.key}…`);
+          if (detail.phase === 'checking-cache') ctx.setLoading('Preparing Duke Nukem 3D…');
           if (detail.phase === 'downloading') {
             const percent = detail.total ? Math.floor(detail.received * 100 / detail.total) : 0;
-            ctx.setLoading(`Caching ${detail.key} from this container…`, `${percent}%`, Math.min(50, 5 + percent * 0.45));
+            ctx.setLoading('Preparing Duke Nukem 3D…', `${percent}%`, Math.min(50, 5 + percent * 0.45));
           }
-          if (detail.phase === 'restored') ctx.setLoading(`Restored ${detail.key} from this browser…`);
+          if (detail.phase === 'restored') ctx.setLoading('Preparing Duke Nukem 3D…');
         }
       });
       document.documentElement.dataset.wasmDataSource = data.entries.every(entry => entry.cached) ? 'cache' : 'container';
-      ctx.setLoading('Loading Duke Nukem 3D engine…', '', 55);
+      ctx.setLoading('Preparing Duke Nukem 3D…', '', 55);
       await loadEngine(ctx);
       await ctx.framework.mountOwnerFiles(engine, data, {
         root: '/game',
@@ -151,7 +151,7 @@
         preservePaths: true,
         onProgress(detail) {
           if (detail.phase !== 'mounting' || !detail.total) return;
-          ctx.setLoading('Mounting Duke Nukem 3D data…', `${Math.floor(detail.copied * 100 / detail.total)}%`, 60 + detail.copied * 35 / detail.total);
+          ctx.setLoading('Preparing Duke Nukem 3D…', `${Math.floor(detail.copied * 100 / detail.total)}%`, 60 + detail.copied * 35 / detail.total);
         }
       });
       engine.FS.chmod('/game', 0o555);
