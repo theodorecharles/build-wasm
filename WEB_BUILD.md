@@ -1,77 +1,102 @@
-# NBlood WebAssembly build
+# Build Engine family WebAssembly build
 
-This branch builds native-source NBlood for a single-threaded Emscripten
-runtime. The current `classic` browser profile uses SDL2, the 8-bit software
-renderer, a fixed 800×600 4:3 backbuffer, SDL/Web Audio, and Asyncify around
-the remaining browser-hostile cutscene and fade waits.
+This branch builds the native NBlood and EDuke32 targets for a single-threaded
+Emscripten runtime. It uses SDL2, SDL/Web Audio, Vorbis, Asyncify, memory
+growth, and the native Build 8-bit software renderer. No game data is
+linked or preloaded. The only preload is tracked `nblood.pk3`, an engine
+resource needed by NBlood.
 
-The downstream does not own an HTML document or CSS shell. It emits
-`wasm-game.json`, `game-adapter.js`, the exact owner-data manifest, the native
-engine artifacts, and an authentic tracked icon. wasm-game-framework 0.5.3
-owns the canonical launcher/loading/runtime document and container server.
+The downstream owns no HTML, CSS, service worker, or web manifest. It installs
+the canonical browser package from exact wasm-game-framework 0.7.1 commit
+`9359fb1`.
 
-## Owner data
+## Required game data
 
-Blood retail files must never be committed, copied into the image, or exposed
-as arbitrary static files. `wasm-game-data.json` is the exact allowlist for One
-Unit Whole Blood: 24 required base files plus 33 optional demo, Cryptic Passage,
-movie, and OGG files. The framework validates uploads into persistent `/data`;
-each browser then downloads each valid file once and caches it in origin-private
-IndexedDB.
+The suite manifest is variant-aware and exact:
 
-`setup-assets.sh` remains an optional local native-development helper. It may
-copy a legal installation into ignored `web/assets/`, but the browser build
-never reads that directory.
+- Blood accepts the verified One Unit Whole Blood policy: 24 required files
+  and 33 optional demo, Cryptic Passage, movie, and OGG entries. Every entry has
+  an exact byte size and SHA-256 digest; RFF files also have their signature.
+- Duke Nukem 3D accepts the 1.3d `DUKE3D.GRP` with size `26524524`,
+  `KenSilverman` signature, and SHA-256
+  `7c729a8f1f2877869feab30b77a062812cd927b8209452892c1b51d69247babc`.
+  The matching `DUKE.RTS` is optional and also has an exact size and digest.
 
-## Build, verify, and run
+The framework validates uploads into persistent container `/data`, exposes
+only allowlisted valid keys through its gated endpoint, and caches them in the
+browser's origin-private IndexedDB. Neither `/data` nor `/local-data` is served
+as a static path. The adapter mounts restored files at read-only `/game` using
+a bounded preserve-paths MEMFS mount. Saves and settings use per-engine IDBFS
+directories.
 
-Set `EMSDK_DIR` when Emscripten is not already active:
+## Build and verify
 
-```bash
-EMSDK_DIR=/home/ted/emsdk ./scripts/test-web.sh
-./serve-web.sh 8007
-```
-
-The local server uses `build-web/container-data` as its persistent provisioning
-directory by default. Override it with `BLOOD_CONTAINER_DATA_ROOT`.
-
-For a container image:
+Use the isolated framework release checkout or another checkout at the exact
+commit:
 
 ```bash
-EMSDK_DIR=/home/ted/emsdk ./scripts/build-image.sh blood-wasm:dev
-docker run --rm -p 127.0.0.1:8007:8088 -v blood-data:/data blood-wasm:dev
+WASM_FRAMEWORK_DIR=/path/to/wasm-game-framework \
+EMSDK_DIR=/path/to/emsdk \
+./scripts/test-web.sh
+
+WASM_FRAMEWORK_DIR=/path/to/wasm-game-framework \
+./scripts/test-static.sh
 ```
 
-Open <http://127.0.0.1:8007/> and provision the legal installation folder once.
-The default launch uses `-quick -nodemo -noautoload -nosetup`. Optional launch
-parameters remain available for deterministic checks:
+`BUILD_WASM_BUILD_DIR` can select an ignored build directory and
+`BUILD_WASM_JOBS` controls compilation parallelism. Expected ignored output is
+under `build-web/dist/`:
 
-- `?autostart=1` starts E1M1.
-- `?autostart=1&campaign=cryptic` starts CP01 when Cryptic data is installed.
-- `?intro=1` enables installed startup movies.
-- `?demos=1` enables installed attract demos.
+```text
+blood.js blood.wasm blood.data
+duke3d.js duke3d.wasm
+game-adapter.js adapters/{blood,duke3d}.js
+wasm-game.json wasm-game-data.json
+blood.ico blood-{192,512}.png
+duke3d.ico duke3d-{192,512}.png
+shared-shell/*
+```
 
-Configuration and saves under `/home/web_user/.config/nblood` are restored and
-automatically synchronized through IDBFS.
+## Images
 
-## Browser profile
+Build and HTTP-smoke the suite and both locked images:
 
-- Classic 8-bit software renderer at 800×600, contained as 4:3 with no stretch.
-- WASD defaults are reapplied after persisted configuration loads.
-- Mouse X turns; classic mouse Y moves forward/back. Vertical mouse look is
-  deliberately disabled for this profile.
-- Pointer lock is allowed only during gameplay. Losing capture opens the native
-  menu; menu/paused state releases capture.
-- SDL stereo and optional owner-supplied OGG music use Web Audio.
-- Single player and loopback only; remote networking is not implemented.
+```bash
+WASM_FRAMEWORK_DIR=/path/to/wasm-game-framework \
+EMSDK_DIR=/path/to/emsdk \
+./scripts/build-images.sh
+```
 
-## Modernized renderer feasibility
+Run a suite image with a private persistent game-data directory:
 
-The native source includes Polymost and extensive GLES conditionals, so a
-separate modernized WebGL 2 profile is feasible without borrowing another WASM
-port. A compile probe reached the renderer but exposed incomplete GLES feature
-gates in `menu.cpp` (`r_detailmapping`, `r_glowmapping`) and `tile.cpp`
-(`voxvboalloc`). This is medium-sized native adaptation work, not a safe flag
-flip. It should be implemented as a reviewed Build-engine GLES adapter shared
-with a future Duke browser port, then exposed as a distinct dynamic-resolution
-profile. The verified classic profile remains software-rendered.
+```bash
+docker run --rm -p 127.0.0.1:8007:8088 -v build-game-data:/data build-wasm:dev
+```
+
+The locked images use the same artifacts and manifest with server-enforced
+variants `blood` and `duke3d`.
+
+## Classic profile
+
+Both titles expose only `classic`:
+
+- fixed 800×600 contained at 4:3 with no stretch;
+- 8-bit software rendering and pixelated presentation;
+- WASD reapplied after persisted configuration loads;
+- horizontal mouse look, while mouse Y preserves classic forward/back input;
+- native menu/gameplay/paused state and capture-loss menu hooks;
+- SDL stereo and optional game-data music through Web Audio.
+
+Duke's desktop attract/menu function is a blocking loop. The browser port
+keeps the native menu and actions but advances that front end once per browser
+frame; attract-demo playback is disabled in this classic browser path.
+
+## Polymost/WebGL blocker
+
+The source has GLES conditionals, and isolated `USE_OPENGL=1`, WebGL 2/ES3
+compile probes now link both Blood and Duke artifacts. That is build evidence,
+not a gameplay claim: the shipped adapter still fixes 8-bit mode, has no
+profile-driven renderer selection or dynamic resize seam, and the WebGL
+artifacts have not received serialized browser renderer, input, lighting,
+context-loss, or aspect testing. Until those native/runtime contracts are
+implemented and reviewed, no dynamic or modern profile is declared.

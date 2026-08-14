@@ -1288,7 +1288,7 @@ static inline char grabmouse_low(char a)
 #ifdef __EMSCRIPTEN__
     // Browsers only grant pointer lock in direct response to a user gesture.
     // The web shell requests it from the canvas click and then asks SDL to
-    // enter relative mode through NBlood_WasmSetPointerLock().
+    // enter relative mode through the selected game's native capture hook.
     if (a)
     {
         EmscriptenPointerlockChangeEvent status = {};
@@ -1758,7 +1758,7 @@ int setvideomode_sdlcommonpost(int32_t x, int32_t y, int32_t c, int32_t fs, int3
         refreshfreq = desktopmode.refresh_rate;
 #ifdef __EMSCRIPTEN__
     // The Emscripten video driver reports an unspecified (zero) desktop refresh
-    // rate.  NBlood uses this value for its default frame limiter, so retain a
+    // rate. Build games use this value for their default frame limiter, so retain a
     // browser-safe cadence instead of calculating an infinite frame delay.
     if (refreshfreq <= 0)
         refreshfreq = 60.0;
@@ -2251,7 +2251,7 @@ void videoShowFrame(int32_t w)
     if (logWasmFrame)
     {
         LOG_F(INFO,
-              "[NBlood WASM] First rendered frame presented: source=%dx%d range=%u..%u surface=%dx%d bpp=%d",
+              "[Build WASM] First rendered frame presented: source=%dx%d range=%u..%u surface=%dx%d bpp=%d",
               sourceRes.x, sourceRes.y, sourceMin, sourceMax,
               sdl_surface ? sdl_surface->w : 0, sdl_surface ? sdl_surface->h : 0,
               sdl_surface ? sdl_surface->format->BitsPerPixel : 0);

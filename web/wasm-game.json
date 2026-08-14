@@ -1,38 +1,107 @@
 {
-  "id": "blood",
-  "title": "Blood",
-  "kicker": "Build Engine",
-  "description": "Play classic Blood with your legally owned One Unit Whole Blood data.",
-  "loadingTitle": "Starting Blood…",
-  "icon": "/blood.ico",
-  "iconPixelated": true,
-  "pwa": {
-    "shortName": "Blood",
-    "themeColor": "#9d1717",
-    "backgroundColor": "#000000",
-    "icons": [
-      { "src": "/blood-192.png", "sizes": "192x192", "type": "image/png" },
-      { "src": "/blood-512.png", "sizes": "512x512", "type": "image/png" }
-    ]
-  },
+  "id": "build-family",
+  "title": "Build Engine WASM Suite",
+  "kicker": "Native NBlood and EDuke32 source",
+  "description": "Play Blood or Duke Nukem 3D using exact required game data and origin-private browser caching.",
   "adapter": "/game-adapter.js",
-  "displayMode": "4:3",
-  "canvasWidth": 800,
-  "canvasHeight": 600,
-  "pixelated": true,
-  "syncBackbuffer": false,
-  "pointerLock": true,
+  "preferencesNamespace": "build-family",
+  "defaultVariant": "blood",
   "fullscreen": true,
+  "defaultFullscreen": false,
+  "pointerLock": true,
   "identity": false,
-  "advanced": false,
-  "graphics": false,
-  "preferencesNamespace": "blood-classic",
-  "provisioningText": "Install the required files from your legally owned One Unit Whole Blood folder. Optional Cryptic Passage, movies, demos, and OGG tracks are accepted when selected together.",
   "theme": {
-    "accent": "#9d1717",
-    "accent-strong": "#ed5555",
-    "border": "#651d1d",
-    "panel": "rgb(18 7 7 / 96%)",
-    "field": "#190a0a"
+    "panel": "rgb(17 8 7 / 96%)",
+    "field": "#170b09"
+  },
+  "variants": {
+    "blood": {
+      "title": "Blood",
+      "kicker": "Build Engine · NBlood native source",
+      "engine": "NBlood / EDuke32 GPL source",
+      "description": "Classic Blood at fixed 800×600 with horizontal-only mouse look and the required One Unit Whole Blood data files.",
+      "loadingTitle": "Starting Blood…",
+      "icon": "/blood.ico",
+      "iconPixelated": true,
+      "background": "/blood-512.png",
+      "backgroundPosition": "center",
+      "backgroundSize": "contain",
+      "pwa": {
+        "id": "/apps/build/blood",
+        "name": "Blood",
+        "shortName": "Blood",
+        "description": "Classic native-source Blood in the Build Engine WASM suite.",
+        "themeColor": "#9d1717",
+        "backgroundColor": "#000000",
+        "icons": [
+          { "src": "/blood-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+          { "src": "/blood-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+        ]
+      },
+      "displayMode": "4:3",
+      "canvasWidth": 800,
+      "canvasHeight": 600,
+      "pixelated": true,
+      "nativeManaged": false,
+      "syncBackbuffer": false,
+      "graphics": true,
+      "advanced": true,
+      "fps": false,
+      "dynamicQuality": false,
+      "profiles": [
+        { "value": "classic", "label": "Classic — 800×600 software renderer" }
+      ],
+      "defaultProfile": "classic",
+      "provisioningText": "Select the required files from a One Unit Whole Blood folder. Optional Cryptic Passage, movies, demos, and OGG tracks are accepted when selected together and cached in this browser.",
+      "theme": {
+        "accent": "#9d1717",
+        "accent-strong": "#ed5555",
+        "border": "#651d1d"
+      }
+    },
+    "duke3d": {
+      "title": "Duke Nukem 3D",
+      "kicker": "Build Engine · EDuke32 native source",
+      "engine": "EDuke32 GPL source",
+      "description": "Classic Duke Nukem 3D at fixed 800×600 with horizontal-only mouse look and the exact required 1.3d data files.",
+      "loadingTitle": "Starting Duke Nukem 3D…",
+      "icon": "/duke3d.ico",
+      "iconPixelated": true,
+      "background": "/duke3d-512.png",
+      "backgroundPosition": "center",
+      "backgroundSize": "contain",
+      "pwa": {
+        "id": "/apps/build/duke3d",
+        "name": "Duke Nukem 3D",
+        "shortName": "Duke 3D",
+        "description": "Classic native-source Duke Nukem 3D in the Build Engine WASM suite.",
+        "themeColor": "#b42318",
+        "backgroundColor": "#000000",
+        "icons": [
+          { "src": "/duke3d-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+          { "src": "/duke3d-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+        ]
+      },
+      "displayMode": "4:3",
+      "canvasWidth": 800,
+      "canvasHeight": 600,
+      "pixelated": true,
+      "nativeManaged": false,
+      "syncBackbuffer": false,
+      "graphics": true,
+      "advanced": true,
+      "fps": false,
+      "dynamicQuality": false,
+      "profiles": [
+        { "value": "classic", "label": "Classic — 800×600 software renderer" }
+      ],
+      "defaultProfile": "classic",
+      "provisioningText": "Select DUKE3D.GRP from the 1.3d game folder. DUKE.RTS is optional. Matching files are cached in this browser after exact validation.",
+      "theme": {
+        "accent": "#b42318",
+        "accent-strong": "#ff705c",
+        "border": "#6f291f"
+      }
+    }
   }
 }

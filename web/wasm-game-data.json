@@ -1,7 +1,11 @@
 {
-  "namespace": "blood-retail",
-  "version": "one-unit-whole-blood-v1",
-  "files": [
+  "namespace": "build-family",
+  "version": "registered-data-2026-08-14-v1",
+  "variants": {
+    "blood": {
+      "namespace": "build-blood-retail",
+      "version": "one-unit-whole-blood-v1",
+      "files": [
     {"key":"blood.ini","name":"BLOOD.INI","path":"BLOOD.INI","size":13219,"sha256":"81d9dcc425d7d9f00485e145c1d20bcdaf746e5667ba92067e0cd746419a69f8"},
     {"key":"blood.rff","name":"BLOOD.RFF","path":"BLOOD.RFF","size":9570681,"magic":[82,70,70,26],"sha256":"bda76c1608f2bfd84e32723064c8fd1b6db7d3536de6544d0415739ab6b72a44"},
     {"key":"gui.rff","name":"GUI.RFF","path":"GUI.RFF","size":7351,"magic":[82,70,70,26],"sha256":"4a2c505e95fdcee57425f0dbbbc23d956c0358ce2dedd9159425afa54c229cf6"},
@@ -60,5 +64,32 @@
     {"key":"blood07.ogg","name":"blood07.ogg","path":"blood07.ogg","size":2172835,"sha256":"2b8a9915355e5dd463f01eeb6b0792a72aac18d0e16438fe5260a9cf2fe12c8f","required":false},
     {"key":"blood08.ogg","name":"blood08.ogg","path":"blood08.ogg","size":1861617,"sha256":"440840aa7eb7f613d48cbf470b1b72273e945d0edd0a3b95f0ad3cf138af14e8","required":false},
     {"key":"blood09.ogg","name":"blood09.ogg","path":"blood09.ogg","size":1421025,"sha256":"77c94584f660665e54081a46d70b0ba9b2d6ff2cd819ae8598d5dcc97d7cece7","required":false}
-  ]
+      ]
+    },
+    "duke3d": {
+      "namespace": "build-duke3d-registered",
+      "version": "registered-1.3d-v1",
+      "files": [
+        {
+          "key": "duke3d.grp",
+          "name": "DUKE3D.GRP",
+          "names": ["DUKE3D.GRP", "duke3d.grp"],
+          "path": "DUKE3D.GRP",
+          "size": 26524524,
+          "magic": "KenSilverman",
+          "sha256": "7c729a8f1f2877869feab30b77a062812cd927b8209452892c1b51d69247babc"
+        },
+        {
+          "key": "duke.rts",
+          "name": "DUKE.RTS",
+          "names": ["DUKE.RTS", "duke.rts"],
+          "path": "DUKE.RTS",
+          "size": 188954,
+          "magic": "IWAD",
+          "sha256": "3fbc1d9b221f2a6952825a511ed63756f8eac4f98001eb094a81f17cb0fd05e5",
+          "required": false
+        }
+      ]
+    }
+  }
 }

@@ -50,6 +50,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #include "vfs.h"
 
+#ifdef __EMSCRIPTEN__
+# include <emscripten.h>
+#endif
+
 // Uncomment to prevent anything except mirrors from drawing. It is sensible to
 // also uncomment ENGINE_CLEAR_SCREEN in build/src/engine_priv.h.
 //#define DEBUG_MIRRORS_ONLY
@@ -97,6 +101,45 @@ static const char *defaultrtsfilename[GAMECOUNT] = { "DUKE.RTS", "NAM.RTS", "NAP
 #endif
 
 int32_t g_Shareware = 0;
+
+#ifdef __EMSCRIPTEN__
+extern "C" EMSCRIPTEN_KEEPALIVE void Duke_WasmFlushPersistence(void)
+{
+    CONFIG_WriteSetup(0);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void Duke_WasmSetPointerLock(int const locked)
+{
+    mouseGrabInput(locked != 0);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int Duke_WasmRuntimeState(void)
+{
+    if (g_player[myconnectindex].ps == nullptr || !(g_player[myconnectindex].ps->gm & MODE_GAME)
+        || (g_player[myconnectindex].ps->gm & (MODE_MENU | MODE_DEMO | MODE_TYPE)))
+        return 0;
+    if (ud.pause_on)
+        return 2;
+    return 1;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void Duke_WasmEnsureMenu(void)
+{
+    if (Duke_WasmRuntimeState() == 1)
+        KB_KeyDown[sc_Escape] = 1;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int Duke_WasmControlsMask(void)
+{
+    int mask = 0;
+    if (ud.config.KeyboardKeys[gamefunc_Move_Forward][0] == sc_W) mask |= 1;
+    if (ud.config.KeyboardKeys[gamefunc_Move_Backward][0] == sc_S) mask |= 2;
+    if (ud.config.KeyboardKeys[gamefunc_Strafe_Left][0] == sc_A) mask |= 4;
+    if (ud.config.KeyboardKeys[gamefunc_Strafe_Right][0] == sc_D) mask |= 8;
+    if (!ud.mouseaiming) mask |= 16;
+    return mask;
+}
+#endif
 
 // This was 32 for a while, but I think lowering it to 24 will help things like the Dingoo.
 // Ideally, we would look at our memory usage on our most cramped platform and figure out
@@ -6567,6 +6610,202 @@ void dukeFillInputForTic(void)
 //        LOG_F(INFO, "Draw routine created with %d byte stack.", g_frameStackSize);
 //}
 
+#ifdef __EMSCRIPTEN__
+static bool g_dukeWasmRestartLoop = true;
+static bool g_dukeWasmFrontend = false;
+
+static void Duke_WasmEnterFrontend(void)
+{
+    auto &myplayer = *g_player[myconnectindex].ps;
+
+    ud.recstat = 0;
+    myplayer.gm &= ~(MODE_GAME | MODE_DEMO | MODE_TYPE);
+    pub = NUMPAGES;
+    pus = NUMPAGES;
+    renderFlushPerms();
+    P_SetGamePalette(&myplayer, BASEPAL, 1);
+    Menu_Open(myconnectindex);
+    ready2send = 0;
+    I_ClearAllInput();
+    g_dukeWasmFrontend = true;
+}
+
+static void Duke_WasmDrawFrontend(void)
+{
+    auto &myplayer = *g_player[myconnectindex].ps;
+
+    if (engineFPSLimit(true))
+    {
+        G_HandleLocalKeys();
+        G_DrawBackground();
+        M_DisplayMenus();
+        G_PrintGameQuotes(screenpeek);
+        videoNextPage();
+        S_Update();
+    }
+
+    if (myplayer.gm & MODE_GAME)
+    {
+        g_dukeWasmFrontend = false;
+        totalclock = ototalclock;
+    }
+}
+
+static bool Duke_WasmBeginLoop(void)
+{
+    auto &myplayer = *g_player[myconnectindex].ps;
+
+    totalclock = 0;
+    ototalclock = 0;
+    lockclock = 0;
+    myplayer.fta = 0;
+    for (int32_t & q : user_quote_time)
+        q = 0;
+
+    Menu_Change(MENU_MAIN);
+    if (g_networkMode != NET_DEDICATED_SERVER)
+    {
+        G_GetCrosshairColor();
+        G_SetCrosshairColor(CrosshairColors.r, CrosshairColors.g, CrosshairColors.b);
+    }
+
+    if (myplayer.gm & MODE_NEWGAME)
+    {
+        G_NewGame(ud.m_volume_number, ud.m_level_number, ud.m_player_skill);
+        myplayer.gm = MODE_RESTART;
+    }
+    else
+    {
+        if (ud.warp_on == 1)
+            G_NewGame_EnterLevel();
+
+        if (ud.warp_on == 0)
+        {
+            if (g_networkMode != NET_DEDICATED_SERVER)
+            {
+                G_DisplayLogo();
+                // G_PlaybackDemo owns the desktop menu and attract loop and
+                // does not return until a game starts. The browser draws the
+                // same native menu one frame at a time instead.
+                Duke_WasmEnterFrontend();
+            }
+        }
+        else
+        {
+            G_UpdateScreenArea();
+            g_dukeWasmFrontend = false;
+        }
+    }
+
+    ud.showweapons = ud.config.ShowWeapons;
+    P_SetupMiscInputSettings();
+    g_player[myconnectindex].pteam = ud.team;
+    if (g_gametypeFlags[ud.coop] & GAMETYPE_TDM)
+        myplayer.palookup = g_player[myconnectindex].pcolor = G_GetTeamPalette(g_player[myconnectindex].pteam);
+    else if (ud.color)
+        myplayer.palookup = g_player[myconnectindex].pcolor = ud.color;
+    else
+        myplayer.palookup = g_player[myconnectindex].pcolor;
+
+    ud.warp_on = 0;
+    KB_KeyDown[sc_Pause] = 0;
+    return true;
+}
+
+static void Duke_WasmFrame(void)
+{
+    if (g_dukeWasmRestartLoop)
+    {
+        if (!Duke_WasmBeginLoop())
+            return;
+        g_dukeWasmRestartLoop = false;
+    }
+
+    auto &myplayer = *g_player[myconnectindex].ps;
+    if (gameHandleEvents() && quitevent)
+    {
+        KB_KeyDown[sc_Escape] = 1;
+        quitevent = 0;
+    }
+
+    if (g_dukeWasmFrontend)
+    {
+        Duke_WasmDrawFrontend();
+        return;
+    }
+
+    double const gameUpdateStartTime = timerGetFractionalTicks();
+    auto const framecnt = g_frameCounter;
+    if ((myplayer.gm & (MODE_MENU | MODE_DEMO)) == 0 && (int32_t)(totalclock - ototalclock) >= TICSPERFRAME)
+    {
+        do
+        {
+            if (g_frameJustDrawn && (myplayer.gm & (MODE_MENU | MODE_DEMO)) == 0)
+                dukeFillInputForTic();
+            if (ready2send == 0)
+                break;
+
+            ototalclock += TICSPERFRAME;
+            if (((ud.show_help == 0 && (myplayer.gm & MODE_MENU) == 0) || ud.recstat == 2) && (myplayer.gm & MODE_GAME))
+            {
+                g_frameJustDrawn = false;
+                Net_GetPackets();
+                G_DoMoveThings();
+            }
+        }
+        while ((myplayer.gm & (MODE_MENU | MODE_DEMO)) == 0 &&
+               (int32_t)(totalclock - ototalclock) >= TICSPERFRAME && !g_saveRequested);
+
+        g_gameUpdateTime = timerGetFractionalTicks() - gameUpdateStartTime;
+        if (g_frameCounter != framecnt)
+            g_gameUpdateTime -= (double)g_lastFrameDuration * (g_frameCounter - framecnt) * 1000.0 / (double)timerGetNanoTickRate();
+        if (g_gameUpdateAvgTime <= 0.0)
+            g_gameUpdateAvgTime = g_gameUpdateTime;
+        g_gameUpdateAvgTime = ((GAMEUPDATEAVGTIMENUMSAMPLES - 1.f) * g_gameUpdateAvgTime + g_gameUpdateTime)
+                             / (float)GAMEUPDATEAVGTIMENUMSAMPLES;
+    }
+
+    g_gameUpdateAndDrawTime = g_gameUpdateTime + (double)g_lastFrameDuration * 1000.0 / (double)timerGetNanoTickRate();
+    G_DoCheats();
+
+    if (myplayer.gm & MODE_NEWGAME)
+    {
+        g_dukeWasmRestartLoop = true;
+        return;
+    }
+    if (myplayer.gm & (MODE_EOL | MODE_RESTART))
+    {
+        switch (G_EndOfLevel())
+        {
+            case 1: return;
+            case 2: g_dukeWasmRestartLoop = true; return;
+        }
+    }
+
+    if (engineFPSLimit((myplayer.gm & MODE_MENU) == MODE_MENU) || g_saveRequested)
+    {
+        if (!g_saveRequested)
+            CONTROL_BindsEnabled = !!(myplayer.gm & (MODE_GAME | MODE_DEMO));
+        drawframe_do();
+    }
+
+    if (g_saveRequested)
+    {
+        KB_FlushKeyboardQueue();
+        g_screenCapture = 1;
+        G_DrawRooms(myconnectindex, 65536);
+        g_screenCapture = 0;
+        G_SavePlayerMaybeMulti(g_lastautosave, true);
+        g_quickload = &g_lastautosave;
+        g_saveRequested = false;
+        walock[TILE_SAVESHOT] = CACHE1D_UNLOCKED;
+    }
+
+    if (myplayer.gm & MODE_DEMO)
+        g_dukeWasmRestartLoop = true;
+}
+#endif
+
 static const char* dukeVerbosityCallback(loguru::Verbosity verbosity)
 {
     switch (verbosity)
@@ -6674,6 +6913,15 @@ int app_main(int argc, char const* const* argv)
     int const readSetup =
 #endif
     CONFIG_ReadSetup();
+#ifdef __EMSCRIPTEN__
+    // The classic browser contract is fixed and must not inherit a desktop
+    // fullscreen or renderer selection from persistent configuration.
+    ud.setup.fullscreen = 0;
+    ud.setup.xdim = 800;
+    ud.setup.ydim = 600;
+    ud.setup.bpp = 8;
+    ud.setup.usemouse = 1;
+#endif
 
 #if defined(_WIN32) && !defined (EDUKE32_STANDALONE)
     if (ud.config.CheckForUpdates == 1)
@@ -6912,7 +7160,14 @@ int app_main(int argc, char const* const* argv)
 
     OSD_Exec("autoexec.cfg");
 
+#ifdef __EMSCRIPTEN__
+    // Apply the browser controls after all persisted configuration has loaded.
+    // Classic Build semantics keep vertical mouse movement as forward/back.
+    CONFIG_SetDefaultKeys(keydefaults);
+    ud.mouseaiming = 0;
+#else
     CONFIG_SetDefaultKeys(keydefaults, true);
+#endif
 
     system_getcvars();
 
@@ -6999,6 +7254,11 @@ int app_main(int argc, char const* const* argv)
 
     VM_OnEvent(EVENT_INITCOMPLETE);
 
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[Duke WASM] Starting cooperative browser game loop");
+    emscripten_set_main_loop(Duke_WasmFrame, 0, true);
+    return 0;
+#else
 MAIN_LOOP_RESTART:
     totalclock = 0;
     ototalclock = 0;
@@ -7202,6 +7462,7 @@ MAIN_LOOP_RESTART:
     while (1);
 
     app_exit(EXIT_SUCCESS);  // not reached (duh)
+#endif
 }
 
 int G_DoMoveThings(void)
