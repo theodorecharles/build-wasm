@@ -2,18 +2,16 @@
 set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-emsdk_dir="${EMSDK_DIR:-${EMSDK:-$HOME/emsdk}}"
-asset_dir="$repo_dir/web/assets"
 dist_dir="$repo_dir/build-web/dist"
 
-if [[ ! -f "$emsdk_dir/emsdk_env.sh" ]]; then
-    printf 'Emscripten environment not found at %s\n' "$emsdk_dir" >&2
-    printf 'Set EMSDK_DIR to the directory containing emsdk_env.sh.\n' >&2
-    exit 1
-fi
-
-if [[ ! -f "$asset_dir/BLOOD.RFF" ]]; then
-    "$repo_dir/setup-assets.sh"
+if ! command -v emcc >/dev/null 2>&1; then
+    emsdk_dir="${EMSDK_DIR:-${EMSDK:-}}"
+    if [[ -z "$emsdk_dir" || ! -f "$emsdk_dir/emsdk_env.sh" ]]; then
+        printf 'Activate Emscripten first, or set EMSDK_DIR to an emsdk checkout.\n' >&2
+        exit 1
+    fi
+    # shellcheck source=/dev/null
+    source "$emsdk_dir/emsdk_env.sh" >/dev/null 2>&1
 fi
 
 mkdir -p "$dist_dir"
@@ -26,23 +24,25 @@ rm -f \
     "$dist_dir/index.js" \
     "$dist_dir/index.wasm"
 
-# shellcheck source=/dev/null
-source "$emsdk_dir/emsdk_env.sh" >/dev/null 2>&1
-
 common_flags=(
     -Wno-unsupported-floating-point-opt
     -sUSE_SDL=2
+    -sUSE_VORBIS=1
 )
 
 link_flags=(
     -sUSE_SDL=2
+    -sUSE_VORBIS=1
     -sALLOW_MEMORY_GROWTH=1
+    -sASYNCIFY=1
+    -sASYNCIFY_STACK_SIZE=64KB
     -sENVIRONMENT=web
     -sEXIT_RUNTIME=0
+    -sEXPORTED_RUNTIME_METHODS=callMain,FS,addRunDependency,removeRunDependency
     -sSTACK_SIZE=1MB
     --shell-file "$repo_dir/web/shell.html"
-    --preload-file "$asset_dir@/game"
-    --preload-file "$repo_dir/nblood.pk3@/nblood.pk3"
+    --preload-file "$repo_dir/nblood.pk3@/game/nblood.pk3"
+    -lidbfs.js
 )
 
 printf '[NBlood WASM] Building browser target with %s\n' "$(emcc --version | head -n 1)"
@@ -69,7 +69,7 @@ make -C "$repo_dir" -f GNUmakefile -j"$(nproc)" blood \
     USE_OPENGL=0 \
     POLYMER=0 \
     USE_LIBVPX=0 \
-    HAVE_VORBIS=0 \
+    HAVE_VORBIS=1 \
     HAVE_FLAC=0 \
     HAVE_XMP=0 \
     USE_MIMALLOC=0 \
@@ -80,3 +80,5 @@ make -C "$repo_dir" -f GNUmakefile -j"$(nproc)" blood \
     LDFLAGS="${link_flags[*]}"
 
 printf '[NBlood WASM] Browser build ready: %s\n' "$dist_dir/index.html"
+cp -f "$repo_dir/web/data-ingest.js" "$dist_dir/data-ingest.js"
+printf '[NBlood WASM] Browser data-ingest module copied to %s/data-ingest.js\n' "$dist_dir"

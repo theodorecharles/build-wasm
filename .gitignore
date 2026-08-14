@@ -2,6 +2,9 @@
 obj/
 /build-web/
 /web/assets/
+/artifacts/
+__pycache__/
+*.pyc
 /nblood.html
 /nblood.js
 /nblood.wasm

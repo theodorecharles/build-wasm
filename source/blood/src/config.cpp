@@ -338,7 +338,11 @@ void CONFIG_SetDefaults(void)
     gBrightness = 8;
     //ud.config.ShowWeapons     = 0;
     SoundToggle     = 1;
+#ifdef __EMSCRIPTEN__
+    CDAudioToggle = 1;
+#else
     CDAudioToggle = 0;
+#endif
     MusicDevice = ASS_AutoDetect;
     gFMPianoFix = 1;
     //ud.config.VoiceToggle     = 5;  // bitfield, 1 = local, 2 = dummy, 4 = other players in DM

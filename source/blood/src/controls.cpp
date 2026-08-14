@@ -36,6 +36,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "map2d.h"
 #include "view.h"
 
+#ifdef __EMSCRIPTEN__
+# include <emscripten.h>
+#endif
+
 
 int32_t ctrlCheckAllInput(void)
 {
@@ -556,6 +560,23 @@ void ctrlGetInput(void)
     gInput.strafe = clamp(gInput.strafe + input.strafe, -2048, 2048);
     gInput.q16turn = fix16_sadd(gInput.q16turn, input.q16turn);
     gInput.q16mlook = fix16_clamp(fix16_sadd(gInput.q16mlook, input.q16mlook), F16(-127)>>2, F16(127)>>2);
+#ifdef __EMSCRIPTEN__
+    if (input.forward || input.strafe || input.q16turn || input.q16mlook ||
+        gInput.buttonFlags.byte || gInput.keyFlags.word || gInput.useFlags.byte || gInput.newWeapon)
+    {
+        EM_ASM({
+            const diagnostics = window.__bloodWasmDiagnostics;
+            diagnostics.inputSeen = true;
+            diagnostics.lastInput = new Array(4);
+            diagnostics.lastInput[0] = $0;
+            diagnostics.lastInput[1] = $1;
+            diagnostics.lastInput[2] = $2;
+            diagnostics.lastInput[3] = $3;
+            document.documentElement.dataset.inputSeen = 'true';
+            document.documentElement.dataset.lastInput = String($0) + ',' + String($1) + ',' + String($2) + ',' + String($3);
+        }, input.forward, input.strafe, input.q16turn, input.q16mlook);
+    }
+#endif
     if (gMe && gMe->pXSprite->health != 0 && !gPaused)
     {
         CONSTEXPR int upAngle = 289;

@@ -36,6 +36,17 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #include "sound.h"
 #include "view.h"
 
+#ifdef __EMSCRIPTEN__
+# include <emscripten.h>
+#endif
+
+static inline void credYieldBrowser(void)
+{
+#ifdef __EMSCRIPTEN__
+    emscripten_sleep(1);
+#endif
+}
+
 inline char keyJoyGetScan(void)
 {
     char ch = keyGetScan();
@@ -56,6 +67,7 @@ char Wait(int nTicks)
     while (totalclock < nTicks)
     {
         gameHandleEvents();
+        credYieldBrowser();
         if (keyJoyGetScan())
             return FALSE;
     }
@@ -69,7 +81,11 @@ char DoFade(char r, char g, char b, int nTicks)
     totalclock = gFrameClock = 0;
     do
     {
-        while (totalclock < gFrameClock) { gameHandleEvents();};
+        while (totalclock < gFrameClock)
+        {
+            gameHandleEvents();
+            credYieldBrowser();
+        }
         gFrameClock += 2;
         scrNextPage();
         scrFadeAmount(divscale16(ClipHigh((int)totalclock, nTicks), nTicks));
@@ -86,7 +102,11 @@ char DoUnFade(int nTicks)
     totalclock = gFrameClock = 0;
     do
     {
-        while (totalclock < gFrameClock) { gameHandleEvents(); };
+        while (totalclock < gFrameClock)
+        {
+            gameHandleEvents();
+            credYieldBrowser();
+        }
         gFrameClock += 2;
         scrNextPage();
         scrFadeAmount(0x10000-divscale16(ClipHigh((int)totalclock, nTicks), nTicks));
@@ -223,6 +243,13 @@ char credPlaySmk(const char *_pzSMK, const char *_pzWAV, int nWav)
         Xfree(pzWAV_);
         return FALSE;
     }
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Playing Smacker cutscene %s (%d frames at %d fps)", pzSMK, nFrames, nFrameRate);
+    EM_ASM({
+        document.documentElement.dataset.cutscene = UTF8ToString($0);
+        document.documentElement.dataset.cutsceneFrame = "0";
+    }, pzSMK);
+#endif
 
     uint8_t *pFrame = (uint8_t*)Xcalloc(1,nWidth*nHeight);
     if (!pFrame)
@@ -292,6 +319,7 @@ char credPlaySmk(const char *_pzSMK, const char *_pzWAV, int nWav)
     do
     {
         gameHandleEvents();
+        credYieldBrowser();
         if (scale((int)(totalclock-nStartTime), nFrameRate, kTicRate) < nFrame)
             continue;
 
@@ -311,6 +339,9 @@ char credPlaySmk(const char *_pzSMK, const char *_pzWAV, int nWav)
 
         ctrlClearAllInput();
         nFrame++;
+#ifdef __EMSCRIPTEN__
+        EM_ASM({ document.documentElement.dataset.cutsceneFrame = String($0); }, nFrame);
+#endif
         Smacker_GetNextFrame(hSMK);
     } while(nFrame < nFrames);
 
@@ -329,6 +360,11 @@ char credPlaySmk(const char *_pzSMK, const char *_pzWAV, int nWav)
     Xfree(pFrame);
     Xfree(pzSMK_);
     Xfree(pzWAV_);
+
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Smacker cutscene playback finished");
+    EM_ASM({ document.documentElement.dataset.cutsceneComplete = "true"; });
+#endif
 
     return TRUE;
 }

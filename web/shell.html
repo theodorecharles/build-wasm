@@ -19,6 +19,11 @@
     main { width: min(100%, 1040px); padding: 20px; text-align: center; }
     h1 { margin: 0 0 14px; color: #9d1717; font-size: clamp(30px, 6vw, 58px); letter-spacing: .18em; }
     #frame { position: relative; border: 1px solid #4a1717; background: #000; box-shadow: 0 0 32px #260000; }
+    #frame:fullscreen { display: grid; place-items: center; border: 0; box-shadow: none; }
+    #frame:fullscreen canvas {
+      width: min(100vw, calc(100vh * 1.6));
+      height: min(100vh, calc(100vw / 1.6));
+    }
     canvas { display: block; width: 100%; aspect-ratio: 16 / 10; background: #000; outline: 0; image-rendering: pixelated; }
     #status {
       position: absolute;
@@ -30,17 +35,73 @@
       color: #c8b9b4;
       white-space: pre-line;
     }
+    #status-content { display: grid; justify-items: center; gap: 14px; }
+    #campaign-row, #intro-row, #demos-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+    #campaign-row[hidden], #intro-row[hidden], #demos-row[hidden] { display: none; }
     #status.ready { pointer-events: none; opacity: 0; transition: opacity 250ms ease; }
+    #data-ingest {
+      margin: 0 0 18px;
+      padding: 16px;
+      text-align: left;
+      border: 1px solid #4a1717;
+      background: #120909;
+    }
+    #data-ingest h2 { margin: 0 0 8px; color: #d8ceca; font-size: 18px; }
+    #data-ingest p { margin: 8px 0; text-align: left; }
+    #data-data-drop {
+      margin-top: 12px;
+      padding: 16px;
+      border: 1px dashed #8a3636;
+      color: #d8ceca;
+      text-align: center;
+    }
+    #data-data-drop[data-dragging="true"] { background: #2b1111; border-color: #f06a6a; }
+    #data-data-list { max-height: 12rem; overflow: auto; padding-left: 1.4rem; font-size: 12px; }
+    #data-data-list li[data-state="missing"] { color: #f0a0a0; }
+    #data-data-list li[data-state="present"] { color: #8cdb9a; }
+    #data-ingest [data-data-message] { min-height: 1.5em; color: #c8b9b4; }
+    #data-ingest [data-data-progress] { width: 100%; }
     p { margin: 12px 0 0; color: #8f7d78; font-size: 13px; }
-    button { margin-top: 10px; border: 1px solid #6c2525; background: #1b0c0c; color: #d8ceca; padding: 7px 12px; cursor: pointer; }
+    button, select { border: 1px solid #6c2525; background: #1b0c0c; color: #d8ceca; padding: 7px 12px; }
+    button { margin-top: 10px; cursor: pointer; }
   </style>
 </head>
 <body>
   <main>
     <h1>Blood</h1>
+    <section id="data-ingest" data-data-ingest>
+      <h2>Game data</h2>
+      <p>Your legally installed Blood files stay in this browser's private cache. They are never uploaded to this server or included in the image.</p>
+      <p data-data-message>Checking this browser's local game data…</p>
+      <ul id="data-data-list" data-data-list></ul>
+      <div id="data-data-drop" data-data-drop>Drag the Blood installation folder here</div>
+      <p><label>or choose the installation folder <input data-data-picker type="file" multiple webkitdirectory directory></label></p>
+      <progress data-data-progress hidden max="1" value="0"></progress>
+    </section>
     <div id="frame">
       <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
-      <div id="status">Loading Blood WebAssembly…</div>
+      <div id="status">
+        <div id="status-content">
+          <span id="status-text">Loading Blood WebAssembly…</span>
+          <label id="campaign-row" hidden>
+            Campaign
+            <select id="campaign">
+              <option value="blood">One Unit Whole Blood</option>
+              <option value="cryptic">Cryptic Passage</option>
+            </select>
+          </label>
+          <label id="intro-row" hidden>
+            <input id="intro" type="checkbox">
+            Play original startup movies
+          </label>
+          <label id="demos-row" hidden>
+            <input id="demos" type="checkbox">
+            Enable original attract demos
+          </label>
+          <button id="start" type="button" hidden>Play Blood</button>
+          <button id="reload" type="button" hidden>Play Again</button>
+        </div>
+      </div>
     </div>
     <button id="fullscreen" type="button">Fullscreen</button>
     <p>Click the game canvas to focus and capture the mouse. Press Esc to release it.</p>
@@ -49,64 +110,275 @@
     const canvas = document.getElementById('canvas');
     const frame = document.getElementById('frame');
     const statusElement = document.getElementById('status');
-    window.__bloodWasmStatus = { audioState: 'not-created', pointerLocked: false };
+    const statusText = document.getElementById('status-text');
+    const startButton = document.getElementById('start');
+    const reloadButton = document.getElementById('reload');
+    const campaignRow = document.getElementById('campaign-row');
+    const campaignSelect = document.getElementById('campaign');
+    const introRow = document.getElementById('intro-row');
+    const introCheckbox = document.getElementById('intro');
+    const demosRow = document.getElementById('demos-row');
+    const demosCheckbox = document.getElementById('demos');
+    const parameters = new URLSearchParams(location.search);
+    const requestedCampaign = parameters.get('campaign');
+    const requestedIntro = parameters.get('intro') === '1';
+    const requestedDemos = parameters.get('demos') === '1';
+    const autostart = parameters.get('autostart') === '1';
+    let runtimeReady = false;
+    let gameStarted = false;
+    let gameDataLoaded = false;
+    let gameDataLoading = false;
+    let readCachedAsset = null;
+    let dataIngestState = { ready: false, present: [] };
+    const tileSizes = [
+      1881007, 1672613, 1001125, 960629, 1647911, 1784595,
+      1372029, 1330026, 710506, 1644888, 2762914, 2062428,
+      1887569, 1474846, 2009595, 1811110, 24574, 10647,
+    ];
+    const requiredData = [
+      { path: 'BLOOD.INI', size: 13219 },
+      { path: 'BLOOD.RFF', size: 9570681, magic: [0x52, 0x46, 0x46, 0x1a] },
+      { path: 'GUI.RFF', size: 7351, magic: [0x52, 0x46, 0x46, 0x1a] },
+      { path: 'SOUNDS.RFF', size: 28552775, magic: [0x52, 0x46, 0x46, 0x1a] },
+      { path: 'SURFACE.DAT', size: 4096 },
+      { path: 'VOXEL.DAT', size: 8192 },
+      ...tileSizes.map((size, index) => ({ path: `TILES${String(index).padStart(3, '0')}.ART`, size })),
+      ...['BLOOD000.DEM', 'BLOOD001.DEM', 'BLOOD002.DEM', 'BLOOD003.DEM',
+        ...Array.from({ length: 9 }, (_, index) => `CP${String(index + 1).padStart(2, '0')}.MAP`),
+        'CPART07.AR_', 'CPART15.AR_', 'CPBB01.MAP', 'CPBB02.MAP', 'CPBB03.MAP', 'CPBB04.MAP',
+        'CPSL.MAP', 'CRYPTIC.INI', 'CRYPTIC.SMK', 'CRYPTIC.WAV', 'GTI.SMK', 'LOGO.SMK',
+        ...Array.from({ length: 8 }, (_, index) => `blood${String(index + 2).padStart(2, '0')}.ogg`),
+        'movie/LOGO.SMK', 'movie/GTI.SMK']
+        .map((path) => ({ path, optional: true })),
+    ];
+    window.__bloodWasmDiagnostics = {
+      level: null,
+      simulationFrames: 0,
+      inputSeen: false,
+      lastInput: null,
+      inputMode: null,
+      gameplayInput: false,
+      playerPosition: null,
+      running: false
+    };
+    document.documentElement.dataset.audioState = 'not-created';
+    document.documentElement.dataset.persistence = 'loading';
+    document.documentElement.dataset.pointerLocked = 'false';
+
+    const resumeAudio = () => {
+      const audioContext = Module?.SDL2?.audioContext;
+      if (!audioContext) return;
+      document.documentElement.dataset.audioState = audioContext.state;
+      const resume = audioContext.state === 'running' ? Promise.resolve() : audioContext.resume();
+      resume
+        .then(() => {
+          document.documentElement.dataset.audioState = audioContext.state;
+          console.info(`[NBlood WASM] Web Audio context is ${audioContext.state}`);
+        })
+        .catch((error) => {
+          document.documentElement.dataset.audioState = 'blocked';
+          console.warn('[NBlood WASM] Web Audio resume was rejected by the browser', error);
+        });
+    };
+
+    const requestGameFocus = () => {
+      canvas.focus();
+      if (!window.__bloodWasmDiagnostics.gameplayInput) return;
+      if (document.pointerLockElement !== canvas) {
+        const request = canvas.requestPointerLock?.();
+        request?.catch?.((error) => console.warn('[NBlood WASM] Pointer lock request was rejected', error));
+      }
+    };
 
     canvas.addEventListener('click', () => {
-      canvas.focus();
-      const audioContext = Module?.SDL2?.audioContext;
-      if (audioContext) {
-        window.__bloodWasmStatus.audioState = audioContext.state;
-        const resume = audioContext.state === 'running' ? Promise.resolve() : audioContext.resume();
-        resume.then(() => {
-          window.__bloodWasmStatus.audioState = audioContext.state;
-          console.info(`[NBlood WASM] Web Audio context is ${audioContext.state}`);
-        });
-      }
-      if (document.pointerLockElement !== canvas) canvas.requestPointerLock?.();
+      requestGameFocus();
+      resumeAudio();
     });
+    async function loadGameData(state) {
+      if (!runtimeReady || !state.ready || !readCachedAsset || gameDataLoading || gameDataLoaded) return;
+      gameDataLoading = true;
+      const paths = state.present || [];
+      const dataRoot = '/game';
+      try {
+        Module.FS.mkdirTree(dataRoot);
+        for (const [index, assetPath] of paths.entries()) {
+          statusText.textContent = `Loading Blood data… (${index + 1}/${paths.length})`;
+          const separator = assetPath.lastIndexOf('/');
+          if (separator >= 0) Module.FS.mkdirTree(`${dataRoot}/${assetPath.slice(0, separator)}`);
+          const bytes = new Uint8Array(await readCachedAsset(assetPath));
+          Module.FS.writeFile(`${dataRoot}/${assetPath}`, bytes);
+        }
+        gameDataLoaded = true;
+        Module.onDataLoaded?.();
+        statusText.textContent = 'Ready';
+        startButton.hidden = false;
+        console.info(`[NBlood WASM] Loaded ${paths.length} browser-local files into /game`);
+      } catch (error) {
+        statusText.textContent = `Could not load Blood data:\n${error.message}`;
+        console.error(error);
+      } finally {
+        gameDataLoading = false;
+      }
+    }
+    startButton.addEventListener('click', () => {
+      if (!runtimeReady || !gameDataLoaded || gameStarted) return;
+      gameStarted = true;
+      window.__bloodWasmDiagnostics.running = true;
+      startButton.disabled = true;
+      statusText.textContent = 'Starting Blood…';
+      canvas.focus();
+      statusElement.classList.add('ready');
+
+      try {
+        if (campaignSelect.value === 'cryptic') launchArguments.push('-ini=CRYPTIC.INI');
+        if (!introCheckbox.checked && !autostart) launchArguments.push('-quick');
+        if (!demosCheckbox.checked || autostart) launchArguments.push('-nodemo');
+        if (autostart) launchArguments.push(campaignSelect.value === 'cryptic' ? '-map=CP01.MAP' : '-map=E1M1.MAP');
+        document.documentElement.dataset.campaign = campaignSelect.value;
+        document.documentElement.dataset.intro = String(introCheckbox.checked);
+        document.documentElement.dataset.demos = String(demosCheckbox.checked && !autostart);
+        Module.callMain(launchArguments);
+        resumeAudio();
+      } catch (error) {
+        statusElement.classList.remove('ready');
+        statusText.textContent = `Blood stopped:\n${error}`;
+        throw error;
+      }
+    });
+    reloadButton.addEventListener('click', () => location.reload());
     document.addEventListener('pointerlockchange', () => {
-      window.__bloodWasmStatus.pointerLocked = document.pointerLockElement === canvas;
-      console.info(`[NBlood WASM] Pointer lock ${window.__bloodWasmStatus.pointerLocked ? 'acquired' : 'released'}`);
+      const pointerLocked = document.pointerLockElement === canvas;
+      document.documentElement.dataset.pointerLocked = String(pointerLocked);
+      Module._NBlood_WasmSetPointerLock?.(pointerLocked ? 1 : 0);
+      console.info(`[NBlood WASM] Pointer lock ${pointerLocked ? 'acquired' : 'released'}`);
     });
     document.addEventListener('pointerlockerror', () => {
       console.warn('[NBlood WASM] Pointer lock request was rejected by the browser');
     });
-    document.getElementById('fullscreen').addEventListener('click', () => frame.requestFullscreen?.());
+    document.getElementById('fullscreen').addEventListener('click', () => {
+      const request = frame.requestFullscreen?.();
+      request?.catch?.((error) => console.warn('[NBlood WASM] Fullscreen request was rejected by the browser', error));
+      canvas.focus();
+      resumeAudio();
+    });
 
-    const launchArguments = ['-game_dir=/game', '-quick', '-nodemo', '-noautoload', '-nosetup'];
-    if (new URLSearchParams(location.search).get('autostart') === '1') {
-      launchArguments.push('-map=E1M1.MAP');
-      console.info('[NBlood WASM] Autostarting E1M1 for browser verification');
+    const flushPersistence = () => {
+      if (!window.__bloodWasmDiagnostics.running) return;
+      try {
+        Module._NBlood_WasmFlushPersistence?.();
+      } catch (error) {
+        console.warn('[NBlood WASM] Could not flush configuration', error);
+      }
+    };
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushPersistence();
+      else resumeAudio();
+    });
+    window.addEventListener('pagehide', flushPersistence);
+    window.addEventListener('nblood-exit', () => {
+      statusElement.classList.remove('ready');
+      statusText.textContent = 'Blood exited';
+      campaignRow.hidden = true;
+      introRow.hidden = true;
+      demosRow.hidden = true;
+      startButton.hidden = true;
+      reloadButton.hidden = false;
+    });
+
+    const launchArguments = ['-game_dir=/game', '-noautoload', '-nosetup'];
+    if (autostart) {
+      launchArguments.push('-quick');
+      console.info('[NBlood WASM] Autostart mode enabled for browser verification');
     }
 
     var Module = {
       arguments: launchArguments,
+      noInitialRun: true,
       canvas,
       preRun: [() => {
         console.info('[NBlood WASM] Preparing game data mount at /game');
+        const persistentDirectory = '/home/web_user/.config/nblood';
+        const dependency = 'nblood-idbfs';
+        let dependencyAdded = false;
+
+        try {
+          Module.FS.filesystems.IDBFS.onAutoPersistStateChanged = (active) => {
+            document.documentElement.dataset.persistence = active ? 'saving' : 'ready';
+          };
+          Module.FS.mkdirTree(persistentDirectory);
+          Module.FS.mount(Module.FS.filesystems.IDBFS, { autoPersist: true }, persistentDirectory);
+          addRunDependency(dependency);
+          dependencyAdded = true;
+          Module.FS.syncfs(true, (error) => {
+            document.documentElement.dataset.persistence = error ? 'unavailable' : 'ready';
+            if (error) console.warn('[NBlood WASM] Persistent storage unavailable; saves will last for this tab only', error);
+            else console.info('[NBlood WASM] Persistent saves and configuration loaded');
+            removeRunDependency(dependency);
+          });
+        } catch (error) {
+          if (dependencyAdded) removeRunDependency(dependency);
+          document.documentElement.dataset.persistence = 'unavailable';
+          console.warn('[NBlood WASM] Could not initialize persistent storage', error);
+        }
       }],
       print: (...args) => console.log(...args),
       printErr: (...args) => console.error(...args),
       setStatus: (text) => {
-        if (!text) statusElement.classList.add('ready');
-        else statusElement.textContent = text;
+        if (text) statusText.textContent = text;
+        else if (gameStarted) statusElement.classList.add('ready');
       },
       monitorRunDependencies: (remaining) => {
-        if (remaining) statusElement.textContent = `Loading Blood data… (${remaining} remaining)`;
+        if (remaining) statusText.textContent = `Loading Blood data… (${remaining} remaining)`;
       },
       onRuntimeInitialized: () => {
-        statusElement.classList.add('ready');
+        runtimeReady = true;
+        void loadGameData(dataIngestState);
+      },
+      onDataLoaded: () => {
+        const crypticAvailable = Module.FS.analyzePath('/game/CRYPTIC.INI').exists;
+        const introAvailable = Module.FS.analyzePath('/game/LOGO.SMK').exists || Module.FS.analyzePath('/game/movie/LOGO.SMK').exists;
+        const demosAvailable = Module.FS.analyzePath('/game/BLOOD000.DEM').exists;
+        if (crypticAvailable) {
+          if (requestedCampaign === 'cryptic') campaignSelect.value = 'cryptic';
+          if (!autostart) campaignRow.hidden = false;
+        }
+        if (introAvailable && !autostart) {
+          introRow.hidden = false;
+          introCheckbox.checked = requestedIntro;
+        }
+        if (demosAvailable && !autostart) {
+          demosRow.hidden = false;
+          demosCheckbox.checked = requestedDemos;
+        }
+        statusElement.classList.remove('ready');
         console.info('[NBlood WASM] WebAssembly runtime initialized');
       },
       onAbort: (reason) => {
         statusElement.classList.remove('ready');
-        statusElement.textContent = `Blood stopped:\n${reason}`;
+        statusText.textContent = `Blood stopped:\n${reason}`;
+        startButton.hidden = true;
       }
     };
 
     window.addEventListener('error', (event) => {
       statusElement.classList.remove('ready');
-      statusElement.textContent = `Browser error:\n${event.message}`;
+      statusText.textContent = `Browser error:\n${event.message}`;
+      startButton.hidden = true;
+    });
+
+    import('./data-ingest.js').then(({ loadAssetBytes, setupDataIngest }) => {
+      readCachedAsset = loadAssetBytes;
+      setupDataIngest({
+        required: requiredData,
+        root: document.querySelector('[data-data-ingest]'),
+        onChange: (state) => {
+          dataIngestState = state;
+          void loadGameData(state);
+        },
+      });
+    }).catch((error) => {
+      document.querySelector('[data-data-message]').textContent = `Local data picker unavailable: ${error.message}`;
+      console.error(error);
     });
   </script>
   {{{ SCRIPT }}}

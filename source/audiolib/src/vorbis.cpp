@@ -372,7 +372,13 @@ int MV_PlayVorbis(char *ptr, uint32_t length, int loopstart, int loopend, int pi
     //if (vd->task.valid() && !vd->task.ready())
     //    vd->task.wait();
 
+#ifdef __EMSCRIPTEN__
+    // Browser builds are intentionally single-threaded. Initialize the decoder
+    // immediately instead of constructing libasync's native thread pool.
+    voice->task = async::spawn(async::inline_scheduler(), [voice]() -> int
+#else
     voice->task = async::spawn([voice]() -> int
+#endif
     {
 #if defined _WIN32
         debugThreadName("MV_PlayVorbis");

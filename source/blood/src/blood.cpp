@@ -74,6 +74,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #ifdef __EMSCRIPTEN__
 # include <emscripten.h>
+
+extern "C" EMSCRIPTEN_KEEPALIVE void NBlood_WasmFlushPersistence(void)
+{
+    CONFIG_WriteSetup(0);
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void NBlood_WasmSetPointerLock(int const locked)
+{
+    mouseGrabInput(locked != 0);
+}
 #endif
 
 #ifdef _WIN32
@@ -610,9 +620,12 @@ int16_t startang, startsectnum;
 void StartLevel(GAMEOPTIONS *pOpt)
 {
 #ifdef __EMSCRIPTEN__
-    LOG_F(INFO, "[NBlood WASM] Starting level %s", pOpt->zLevelName);
+    LOG_F(INFO, "[NBlood WASM] Starting level episode=%d map=%d name=%s", pOpt->nEpisode, pOpt->nLevel, pOpt->zLevelName);
 #endif
     EndLevel();
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Level start: previous level shut down");
+#endif
     gInput = {};
     gStartNewGame = 0;
     ready2send = 0;
@@ -621,6 +634,9 @@ void StartLevel(GAMEOPTIONS *pOpt)
     if (gDemo.at0 && gGameStarted)
         gDemo.Close();
     netWaitForEveryone(0);
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Level start: initial network barrier complete");
+#endif
     VanillaModeUpdate();
     if (pOpt->nGameType == kGameTypeSinglePlayer)
     {
@@ -638,6 +654,9 @@ void StartLevel(GAMEOPTIONS *pOpt)
             if (gDemo.at1 == 0 && !Bstrlen(pOpt->szUserMap))
                 levelPlayIntroScene(pOpt->nEpisode, pOpt->nLevel);
         }
+#ifdef __EMSCRIPTEN__
+        LOG_F(INFO, "[NBlood WASM] Level start: single-player options and intro complete");
+#endif
 
         ///////
         pOpt->weaponsV10x = gWeaponsV10x;
@@ -682,11 +701,17 @@ void StartLevel(GAMEOPTIONS *pOpt)
         }
     }
     drawLoadingScreen(gStatsPicnum);
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Level start: loading screen presented; loading map %s", pOpt->zLevelName);
+#endif
     if (dbLoadMap(pOpt->zLevelName,(int*)&startpos.x,(int*)&startpos.y,(int*)&startpos.z,&startang,&startsectnum,(unsigned int*)&pOpt->uMapCRC))
     {
         gQuitGame = true;
         return;
     }
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Level start: map database loaded");
+#endif
     char levelName[BMAX_PATH];
     G_LoadMapHack(levelName, pOpt->zLevelName);
     wsrand(pOpt->uMapCRC);
@@ -801,6 +826,9 @@ void StartLevel(GAMEOPTIONS *pOpt)
     pOpt->uGameFlags &= ~(kGameFlagContinuing|kGameFlagEnding);
     scrSetDac();
     PreloadCache();
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Level start: cache preload complete");
+#endif
     InitMirrors();
     gFrameClock = 0;
     trInit();
@@ -813,6 +841,9 @@ void StartLevel(GAMEOPTIONS *pOpt)
     if (!gDemo.at1)
         gGameMenuMgr.Deactivate();
     levelTryPlayMusicOrNothing(pOpt->nEpisode, pOpt->nLevel);
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Level start: music initialized");
+#endif
     viewSetMessage("");
     viewSetErrorMessage("");
     viewResizeView(gViewSize);
@@ -821,12 +852,24 @@ void StartLevel(GAMEOPTIONS *pOpt)
     if (!VanillaMode())
         viewClearInterpolations();
     netWaitForEveryone(0);
+#ifdef __EMSCRIPTEN__
+    LOG_F(INFO, "[NBlood WASM] Level start: final network barrier complete");
+#endif
     totalclock = 0;
     gPaused = 0;
     gGameStarted = 1;
     ready2send = 1;
 #ifdef __EMSCRIPTEN__
     LOG_F(INFO, "[NBlood WASM] Level loaded and playable: %s", pOpt->zLevelName);
+    EM_ASM({
+        const level = UTF8ToString($0);
+        document.documentElement.dataset.level = level;
+        window.__bloodWasmDiagnostics.level = level;
+        window.__bloodWasmDiagnostics.simulationFrames = 0;
+        window.__bloodWasmDiagnostics.playerPosition = null;
+        document.documentElement.dataset.simulationFrames = '0';
+        delete document.documentElement.dataset.playerPosition;
+    }, pOpt->zLevelName);
 #endif
 }
 
@@ -1932,6 +1975,10 @@ RESTART:
         if (gQuitGame)
         {
             LOG_F(INFO, "[NBlood WASM] Browser game loop stopped");
+            EM_ASM({
+                window.__bloodWasmDiagnostics.running = false;
+                window.dispatchEvent(new Event("nblood-exit"));
+            });
             emscripten_cancel_main_loop();
             ShutDown();
             return;
@@ -1972,6 +2019,22 @@ RESTART:
                                 break;
                             faketimerhandler();
                             ProcessFrame();
+#ifdef __EMSCRIPTEN__
+                            if (gMe && gMe->pSprite)
+                            {
+                                EM_ASM({
+                                    const diagnostics = window.__bloodWasmDiagnostics;
+                                    diagnostics.simulationFrames++;
+                                    diagnostics.playerPosition = new Array(4);
+                                    diagnostics.playerPosition[0] = $0;
+                                    diagnostics.playerPosition[1] = $1;
+                                    diagnostics.playerPosition[2] = $2;
+                                    diagnostics.playerPosition[3] = $3;
+                                    document.documentElement.dataset.simulationFrames = String(diagnostics.simulationFrames);
+                                    document.documentElement.dataset.playerPosition = String($0) + ',' + String($1) + ',' + String($2) + ',' + String($3);
+                                }, gMe->pSprite->x, gMe->pSprite->y, gMe->pSprite->z, gMe->pSprite->ang);
+                            }
+#endif
                         }
                     } while (totalclock >= gNetFifoClock && ready2send);
                     gameUpdate = true;
@@ -2084,6 +2147,30 @@ RESTART:
             default:
                 break;
             }
+#ifdef __EMSCRIPTEN__
+            EM_ASM({
+                const diagnostics = window.__bloodWasmDiagnostics;
+                const inputMode = $0;
+                const gameplayInput = Boolean($1);
+                if (diagnostics.inputMode !== inputMode || diagnostics.gameplayInput !== gameplayInput)
+                {
+                    diagnostics.inputMode = inputMode;
+                    diagnostics.gameplayInput = gameplayInput;
+                    document.documentElement.dataset.inputMode = String(inputMode);
+                    document.documentElement.dataset.gameplayInput = String(gameplayInput);
+                    if (!gameplayInput && document.pointerLockElement)
+                        document.exitPointerLock();
+                }
+            }, gInputMode, gGameStarted && gInputMode == INPUT_MODE_0 && !gGameMenuMgr.m_bActive);
+            static bool wasmMenuWasActive;
+            bool const wasmMenuIsActive = gGameMenuMgr.m_bActive;
+            if (wasmMenuWasActive && !wasmMenuIsActive)
+            {
+                CONFIG_WriteSetup(0);
+                LOG_F(INFO, "[NBlood WASM] Configuration queued for persistent storage");
+            }
+            wasmMenuWasActive = wasmMenuIsActive;
+#endif
             frameJustDrawn = true;
             videoNextPage();
         }

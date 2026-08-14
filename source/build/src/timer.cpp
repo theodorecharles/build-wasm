@@ -17,6 +17,10 @@
 
 #include <atomic>
 
+#ifdef __EMSCRIPTEN__
+# include <emscripten/emscripten.h>
+#endif
+
 #if defined RENDERTYPESDL && (SDL_MAJOR_VERSION >= 2)
 # define HAVE_TIMER_SDL
 #endif
@@ -107,9 +111,16 @@ static FORCE_INLINE ATTRIBUTE((flatten)) uint64_t timerSampleRDTSC(void)
 // returns ticks since epoch in the format and frequency specified
 template<typename T> T timerGetTicks(T freq)
 {
+#ifdef __EMSCRIPTEN__
+    // Emscripten's libc clock_gettime ABI has changed across SDK releases.
+    // Using the browser's monotonic clock directly keeps all Build timers in
+    // the requested units and avoids treating nanoseconds as milliseconds.
+    return (T)(emscripten_get_now() * ((double)freq / 1000.0));
+#else
     timespec ts;
     enet_gettime(CLOCK_TYPE, &ts);
     return ts.tv_sec * freq + (T)((uint64_t)ts.tv_nsec * freq / (T)1000000000);
+#endif
 }
 
 int timerGetClockRate(void) { return clockTicksPerSecond; }

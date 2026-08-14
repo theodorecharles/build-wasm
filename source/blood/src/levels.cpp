@@ -448,9 +448,23 @@ bool levelTryPlayMusic(int nEpisode, int nLevel, bool bSetLevelSong)
 {
     char buffer[BMAX_PATH];
     if (CDAudioToggle && gEpisodeInfo[nEpisode].levelsInfo[nLevel].SongId > 0)
+    {
         snprintf(buffer, BMAX_PATH, "blood%02i.ogg", gEpisodeInfo[nEpisode].levelsInfo[nLevel].SongId);
-    else
-        strncpy(buffer, gEpisodeInfo[nEpisode].levelsInfo[nLevel].Song, BMAX_PATH);
+        if (!sndPlaySong(buffer, true))
+        {
+#ifdef __EMSCRIPTEN__
+            LOG_F(INFO, "[NBlood WASM] Playing CD-audio replacement %s", buffer);
+#endif
+            if (bSetLevelSong)
+                strncpy(gGameOptions.zLevelSong, buffer, BMAX_PATH);
+            return false;
+        }
+#ifdef __EMSCRIPTEN__
+        LOG_F(WARNING, "[NBlood WASM] CD-audio replacement %s is unavailable; using MIDI", buffer);
+#endif
+    }
+
+    strncpy(buffer, gEpisodeInfo[nEpisode].levelsInfo[nLevel].Song, BMAX_PATH);
     bool bReturn = !!sndPlaySong(buffer, true);
     if (!bReturn || bSetLevelSong)
         strncpy(gGameOptions.zLevelSong, buffer, BMAX_PATH);
@@ -490,4 +504,3 @@ void LevelsLoadSaveConstruct(void)
 {
     myLoadSave = new LevelsLoadSave();
 }
-

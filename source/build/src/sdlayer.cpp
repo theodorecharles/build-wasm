@@ -15,6 +15,10 @@
 #include "sdl_inc.h"
 #include "softsurface.h"
 
+#ifdef __EMSCRIPTEN__
+# include <emscripten/html5.h>
+#endif
+
 #if SDL_MAJOR_VERSION >= 2
 # include "imgui.h"
 # include "imgui_impl_sdl2.h"
@@ -1281,6 +1285,17 @@ static inline char grabmouse_low(char a)
        is called only when a window is ready?                */
     if (sdl_window)
         SDL_SetWindowGrab(sdl_window, a ? SDL_TRUE : SDL_FALSE);
+#ifdef __EMSCRIPTEN__
+    // Browsers only grant pointer lock in direct response to a user gesture.
+    // The web shell requests it from the canvas click and then asks SDL to
+    // enter relative mode through NBlood_WasmSetPointerLock().
+    if (a)
+    {
+        EmscriptenPointerlockChangeEvent status = {};
+        if (emscripten_get_pointerlock_status(&status) != EMSCRIPTEN_RESULT_SUCCESS || !status.isActive)
+            return -1;
+    }
+#endif
     return SDL_SetRelativeMouseMode(a ? SDL_TRUE : SDL_FALSE);
 #else
     UNREFERENCED_PARAMETER(a);

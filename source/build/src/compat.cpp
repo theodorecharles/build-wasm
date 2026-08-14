@@ -127,7 +127,7 @@ char *Bgethomedir(void)
     return Xstrdup(cwd);
 #elif defined(__EMSCRIPTEN__)
     char const *e = getenv("HOME");
-    return Xstrdup(e != NULL && e[0] != '\0' ? e : "/");
+    return Xstrdup(e != NULL && e[0] != '\0' ? e : "/home/web_user");
 #else
     char const *e;
     if ((e = getenv("HOME")) == NULL || e[0] == '\0')
