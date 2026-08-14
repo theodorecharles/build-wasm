@@ -7,7 +7,7 @@ framework_dir="${WASM_FRAMEWORK_DIR:-$repo_dir/../wasm-game-framework}"
 
 "$repo_dir/build-web.sh"
 
-for required in blood.js blood.wasm blood.data blood.ico game-adapter.js wasm-game.json wasm-game-data.json \
+for required in blood.js blood.wasm blood.data blood.ico blood-192.png blood-512.png game-adapter.js wasm-game.json wasm-game-data.json \
     shared-shell/wolfwasm-shell.js shared-shell/wolfwasm-shell.css \
     shared-shell/wolfwasm-bootstrap.js shared-shell/wasm-game-framework.json; do
     [[ -f "$dist_dir/$required" ]] || { printf 'Missing Blood web artifact: %s\n' "$required" >&2; exit 1; }
@@ -36,9 +36,9 @@ const c=JSON.parse(fs.readFileSync(process.argv[1]));
 const m=JSON.parse(fs.readFileSync(process.argv[2]));
 const p=JSON.parse(fs.readFileSync(process.argv[3]));
 const required=m.files.filter(f=>f.required!==false), optional=m.files.filter(f=>f.required===false);
-if(c.id!=="blood"||c.displayMode!=="4:3"||c.canvasWidth!==800||c.canvasHeight!==600||c.syncBackbuffer!==false)process.exit(1);
+if(c.id!=="blood"||c.displayMode!=="4:3"||c.canvasWidth!==800||c.canvasHeight!==600||c.syncBackbuffer!==false||c.fullscreen!==true||c.pwa?.icons?.length!==2)process.exit(1);
 if(m.namespace!=="blood-retail"||required.length!==24||optional.length!==33||m.files.some(f=>!f.sha256))process.exit(1);
-if(p.package!=="@wasm-game-framework/browser"||p.version!=="0.5.3"||!p.bootstrapSha256)process.exit(1);
+if(p.package!=="@wasm-game-framework/browser"||p.version!=="0.6.1"||!p.bootstrapSha256)process.exit(1);
 ' "$dist_dir/wasm-game.json" "$dist_dir/wasm-game-data.json" "$dist_dir/shared-shell/wasm-game-framework.json"
 
 for marker in \
@@ -79,4 +79,4 @@ if grep -R -F '/home/ted/' "$dist_dir" "$repo_dir/web" "$repo_dir/build-web.sh" 
 fi
 
 git -C "$repo_dir" diff --check
-printf 'Blood web build passed framework 0.5.3, classic controls/aspect, persistence, and owner-data checks.\n'
+printf 'Blood web build passed framework 0.6.1, classic controls/aspect, PWA, persistence, and owner-data checks.\n'

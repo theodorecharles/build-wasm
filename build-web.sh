@@ -87,6 +87,12 @@ cp -f "$repo_dir/web/game-adapter.js" "$dist_dir/game-adapter.js"
 cp -f "$repo_dir/web/wasm-game.json" "$dist_dir/wasm-game.json"
 cp -f "$repo_dir/web/wasm-game-data.json" "$dist_dir/wasm-game-data.json"
 cp -f "$repo_dir/source/blood/rsrc/game_icon.ico" "$dist_dir/blood.ico"
+if ! command -v magick >/dev/null 2>&1; then
+    printf 'ImageMagick is required to build authentic Blood PWA icons.\n' >&2
+    exit 1
+fi
+magick "$repo_dir/source/blood/rsrc/game_icon.ico[10]" -resize 192x192 "$dist_dir/blood-192.png"
+magick "$repo_dir/source/blood/rsrc/game_icon.ico[10]" -resize 512x512 "$dist_dir/blood-512.png"
 
 framework_dir="${WASM_FRAMEWORK_DIR:-$repo_dir/../wasm-game-framework}"
 if [[ ! -x "$framework_dir/scripts/install-browser-package.sh" ]]; then
