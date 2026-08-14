@@ -78,7 +78,7 @@ never be used as a Docker build input or checked-in release artifact.
 
 ## Build and local runtime
 
-The toolchain is expected at `/home/ted/emsdk` or `$EMSDK_DIR`:
+Activate Emscripten first or set `$EMSDK_DIR` to an emsdk checkout:
 
 ```bash
 ./build-web.sh
@@ -89,6 +89,9 @@ The build emits `build-web/dist/index.html`, `index.js`, `index.wasm`, the
 small non-retail preload bundle, and `data-ingest.js`. The local server serves
 only that assetless bundle and rejects writes. Chromium tests provide Steam
 files through the directory picker; no server-side data directory is needed.
+The optional `BLOOD_DEV_DATA_ROOT` automation helper is hard-limited to a
+loopback bind; `tools/serve-web.py` refuses to expose it on a non-loopback
+address.
 
 The page must remain useful with an empty data directory: the WASM runtime can
 initialize, the file list remains visible, and the page explains how to supply

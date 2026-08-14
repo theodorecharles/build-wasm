@@ -113,6 +113,8 @@ def main() -> None:
     parser.add_argument("--bind", default="127.0.0.1")
     parser.add_argument("--port", type=int, required=True)
     args = parser.parse_args()
+    if args.data_root and args.bind not in {"127.0.0.1", "::1", "localhost"}:
+        parser.error("--data-root is a local Chromium-test helper and requires a loopback --bind")
     directory = os.path.abspath(args.directory)
     handler = lambda *handler_args, **handler_kwargs: BloodHandler(
         *handler_args, directory=directory, **handler_kwargs
