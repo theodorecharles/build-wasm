@@ -32,7 +32,10 @@ async function exercise(variant) {
   const canvasEvents = new Map();
   const calls = [];
   const transitions = [];
+  const stateChanges = [];
   const timers = [];
+  let nativeState = 1;
+  let now = 1000;
   let createdPolicy;
   let loadedPolicy;
   let module;
@@ -54,8 +57,12 @@ async function exercise(variant) {
         module.removeRunDependency = () => {};
         module.callMain = arguments_ => calls.push(['callMain', Array.from(arguments_)]);
         const prefix = isBlood ? '_NBlood_Wasm' : '_Duke_Wasm';
-        module[`${prefix}RuntimeState`] = () => 1;
-        module[`${prefix}EnsureMenu`] = () => calls.push(['menu']);
+        module[`${prefix}RuntimeState`] = () => nativeState;
+        module[`${prefix}EnsureMenu`] = () => {
+          calls.push(['menu']);
+          if (isBlood) nativeState = 2;
+        };
+        if (isBlood) module._NBlood_WasmCaptureIntent = () => nativeState === 4 ? 1 : 0;
         module[`${prefix}SetPointerLock`] = value => calls.push(['capture', value]);
         module[`${prefix}ControlsMask`] = () => 31;
         module[`${prefix}FlushPersistence`] = () => calls.push(['flush']);
@@ -69,7 +76,8 @@ async function exercise(variant) {
     clearInterval() {}
   };
   const sandbox = {
-    console, document, window, URLSearchParams, location: { search: '' },
+    console, document, window, URLSearchParams, queueMicrotask,
+    performance: { now: () => now }, location: { search: '' },
     crypto: { subtle: { digest: async () => new ArrayBuffer(32) } },
     fetch: async request => {
       assert.equal(request, '/wasm-game-data.json');
@@ -104,7 +112,10 @@ async function exercise(variant) {
     shell: { resumeAudio() {}, engineState() { return transitions.at(-1) || 'launcher'; } },
     setLoading() {}, log() {},
     showRuntime(state) { transitions.push(state); },
-    setEngineState(state) { transitions.push(state); }
+    setEngineState(state, options) {
+      transitions.push(state);
+      stateChanges.push({ state, capture: options?.capture === true, event: options?.event });
+    }
   };
 
   assert.equal(adapter.readEngineState(), 'menu');
@@ -120,8 +131,54 @@ async function exercise(variant) {
   assert.ok(launch[1].includes('/game') || launch[1].includes('-game_dir=/game'));
   adapter.inputCaptureChanged(true);
   assert.deepEqual(calls.at(-1), ['capture', 1]);
-  adapter.captureLost();
-  assert.deepEqual(calls.at(-1), ['menu']);
+  if (isBlood) {
+    const nativeSource = fs.readFileSync(path.join(repo, 'source/blood/src/blood.cpp'), 'utf8');
+    assert.match(nativeSource, /gInputMode == INPUT_MODE_3[\s\S]*return 3;/,
+      'Blood debrief must be an authoritative native state');
+    assert.match(nativeSource, /gStartNewGame[\s\S]*return 4;/,
+      'Blood New Game must publish native loading state');
+    assert.match(nativeSource, /NBlood_WasmCaptureIntent[\s\S]*gStartNewGame != 0/,
+      'Blood New Game must publish native capture intent');
+    assert.match(nativeSource, /NBlood_WasmEnsureMenu[\s\S]*gGameMenuMgr\.Push\(&menuMainWithSave/,
+      'Blood capture loss must synchronously open the native pause menu');
+    assert.doesNotMatch(nativeSource, /document\.exitPointerLock/,
+      'Blood native diagnostics must not compete with framework pointer-lock ownership');
+    assert.match(fs.readFileSync(path.join(repo, 'source/build/src/sdlayer.cpp'), 'utf8'),
+      /emscripten_get_pointerlock_status/,
+      'Blood relative mouse mode must observe framework-owned pointer lock');
+
+    nativeState = 2;
+    timers[0]();
+    assert.equal(transitions.at(-1), 'paused');
+    nativeState = 3;
+    timers[0]();
+    assert.equal(transitions.at(-1), 'debrief');
+    nativeState = 4;
+    assert.equal(adapter.readEngineState(), 'loading');
+    assert.equal(adapter.readCaptureIntent(), true);
+
+    nativeState = 1;
+    transitions.push('menu');
+    const event = { key: 'Enter' };
+    events.get('keyup')(event);
+    await Promise.resolve();
+    assert.deepEqual(stateChanges.at(-1), { state: 'gameplay', capture: true, event });
+
+    adapter.captureLost({}, context);
+    assert.deepEqual(calls.at(-1), ['menu']);
+    assert.equal(transitions.at(-1), 'paused');
+    const menuCalls = calls.filter(call => call[0] === 'menu').length;
+    nativeState = 1;
+    now += 100;
+    events.get('keydown')({ key: 'Escape' });
+    adapter.captureLost({}, context);
+    assert.equal(calls.filter(call => call[0] === 'menu').length, menuCalls,
+      'Escape-triggered capture loss must not inject a second menu action');
+  } else {
+    assert.equal(adapter.readCaptureIntent, undefined, 'Duke behavior must remain unchanged');
+    adapter.captureLost();
+    assert.deepEqual(calls.at(-1), ['menu']);
+  }
   assert.ok(timers.length, 'native state telemetry must remain active');
   timers[0]();
   assert.equal(document.documentElement.dataset[isBlood ? 'bloodControlsValid' : 'dukeControlsValid'], 'true');

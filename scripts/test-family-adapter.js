@@ -8,7 +8,7 @@ const vm = require('node:vm');
 
 const source = fs.readFileSync(path.resolve(__dirname, '../web/game-adapter.js'), 'utf8');
 
-async function exercise(variant, expectedScript) {
+async function exercise(variant, expectedScript, expectedIntent) {
   const calls = [];
   const child = {
     async init(context) { calls.push(['init', context.variant]); },
@@ -23,6 +23,9 @@ async function exercise(variant, expectedScript) {
     contextLost(event, context) { calls.push(['contextLost', event.type, context.variant]); },
     contextRestored(event, context) { calls.push(['contextRestored', event.type, context.variant]); }
   };
+  if (expectedIntent) {
+    child.readCaptureIntent = context => { calls.push(['intent', context.variant]); return true; };
+  }
   const sandbox = { console };
   sandbox.globalThis = sandbox;
   sandbox.document = {
@@ -43,6 +46,7 @@ async function exercise(variant, expectedScript) {
   assert.equal(sandbox.WasmGameAdapter, family);
   assert.equal(await family.start(context), `started-${variant}`);
   assert.equal(family.readEngineState(context), 'gameplay');
+  assert.equal(family.readCaptureIntent(context), expectedIntent);
   family.resize({ width: 800 }, context);
   family.captureLost({ reason: 'escape' }, context);
   family.inputCaptureChanged(true, context);
@@ -52,14 +56,14 @@ async function exercise(variant, expectedScript) {
   family.contextLost({ type: 'webglcontextlost' }, context);
   family.contextRestored({ type: 'webglcontextrestored' }, context);
   assert.deepEqual(calls.map(call => call[0]), [
-    'init', 'start', 'state', 'resize', 'captureLost', 'capture', 'move', 'button',
+    'init', 'start', 'state', ...(expectedIntent ? ['intent'] : []), 'resize', 'captureLost', 'capture', 'move', 'button',
     'preferences', 'contextLost', 'contextRestored'
   ]);
 }
 
 (async () => {
-  await exercise('blood', '/adapters/blood.js');
-  await exercise('duke3d', '/adapters/duke3d.js');
+  await exercise('blood', '/adapters/blood.js', true);
+  await exercise('duke3d', '/adapters/duke3d.js', false);
   console.log('Verified family adapter dispatch and native hook delegation for both variants.');
 })().catch(error => {
   console.error(error);

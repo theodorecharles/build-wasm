@@ -40,6 +40,7 @@
     async init(context) { return (await loadDelegate(context)).init?.(context); },
     async start(context) { return (await loadDelegate(context)).start(context); },
     readEngineState(context) { return delegate?.readEngineState?.(context) || 'launcher'; },
+    readCaptureIntent(context) { return delegate?.readCaptureIntent?.(context) === true; },
     resize(detail, context) { return delegate?.resize?.(detail, context); },
     captureLost(detail, context) { return delegate?.captureLost?.(detail, context); },
     inputCaptureChanged(captured, context) { return delegate?.inputCaptureChanged?.(captured, context); },

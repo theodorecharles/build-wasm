@@ -107,17 +107,35 @@ INPUT_MODE gInputMode;
 #ifdef __EMSCRIPTEN__
 extern "C" EMSCRIPTEN_KEEPALIVE int NBlood_WasmRuntimeState(void)
 {
-    if (!gGameStarted || gGameMenuMgr.m_bActive || gInputMode != INPUT_MODE_0)
+    if (gStartNewGame)
+        return 4;
+    if (!gGameStarted)
         return 0;
-    if (gPaused)
+    if (gInputMode == INPUT_MODE_3)
+        return 3;
+    if (gGameMenuMgr.m_bActive || gPaused)
         return 2;
+    if (gInputMode != INPUT_MODE_0)
+        return 0;
     return 1;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int NBlood_WasmCaptureIntent(void)
+{
+    return gStartNewGame != 0;
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void NBlood_WasmEnsureMenu(void)
 {
     if (gGameStarted && !gGameMenuMgr.m_bActive)
-        KB_KeyDown[sc_Escape] = 1;
+    {
+        keyFlushScans();
+        if (gPlayer[myconnectindex].pXSprite->health != 0 ||
+            gGameOptions.nGameType != kGameTypeSinglePlayer)
+            gGameMenuMgr.Push(&menuMainWithSave, -1);
+        else
+            gGameMenuMgr.Push(&menuMain, -1);
+    }
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE int NBlood_WasmControlsMask(void)
@@ -2197,8 +2215,6 @@ RESTART:
                     diagnostics.gameplayInput = gameplayInput;
                     document.documentElement.dataset.inputMode = String(inputMode);
                     document.documentElement.dataset.gameplayInput = String(gameplayInput);
-                    if (!gameplayInput && document.pointerLockElement)
-                        document.exitPointerLock();
                 }
             }, gInputMode, gGameStarted && gInputMode == INPUT_MODE_0 && !gGameMenuMgr.m_bActive);
             static bool wasmMenuWasActive;

@@ -59,7 +59,9 @@ Once granted, test each variant with the required data files:
 3. Launch renders a contained 4:3 800×600 native menu.
 4. Gameplay verifies WASD, horizontal turn, classic mouse-Y movement, firing,
    use, jump/crouch as applicable, Escape, capture loss, and return to play.
-5. Verify non-silent SDL/Web Audio and native menu/gameplay/paused state.
+5. Verify non-silent SDL/Web Audio; Blood's native
+   menu/gameplay/paused/debrief/loading state and New Game capture; and Duke's
+   native menu/gameplay/paused state.
 6. Hard refresh and confirm required files restore from IndexedDB without another
    gated container transfer.
 7. Change settings, save, reload, and verify IDBFS persistence.

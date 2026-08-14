@@ -6,6 +6,7 @@
   let started = false;
   let runtimePromise = null;
   let telemetryTimer = 0;
+  let lastEscapeAt = 0;
 
   function diagnostics() {
     return globalThis.__bloodWasmDiagnostics = globalThis.__bloodWasmDiagnostics || {
@@ -22,7 +23,23 @@
 
   function nativeState() {
     if (!started || typeof engine?._NBlood_WasmRuntimeState !== 'function') return 'menu';
-    return ['menu', 'gameplay', 'paused'][engine._NBlood_WasmRuntimeState()] || 'menu';
+    return ['menu', 'gameplay', 'paused', 'debrief', 'loading'][engine._NBlood_WasmRuntimeState()] || 'menu';
+  }
+
+  function captureIntent() {
+    return Boolean(started && typeof engine?._NBlood_WasmCaptureIntent === 'function' &&
+      engine._NBlood_WasmCaptureIntent());
+  }
+
+  function synchronizeState(ctx, event, captureGameplay) {
+    const state = nativeState();
+    const shouldCapture = captureGameplay && (state === 'gameplay' || (state === 'loading' && captureIntent()));
+    if (state !== ctx.shell.engineState() || shouldCapture) {
+      ctx.setEngineState(state, shouldCapture
+        ? { capture: true, event }
+        : undefined);
+    }
+    return state;
   }
 
   async function sha256Hex(file) {
@@ -74,7 +91,7 @@
         }],
         print: (...args) => { console.log('[NBlood WASM]', ...args); ctx.log(args.join(' ')); },
         printErr: (...args) => { console.error('[NBlood WASM]', ...args); ctx.log(`ERROR: ${args.join(' ')}`); },
-        setStatus: message => { if (message) ctx.setLoading(String(message)); },
+        setStatus: message => { if (message) ctx.setLoading('Loading Blood engine…'); },
         monitorRunDependencies: remaining => {
           if (remaining) ctx.setLoading('Loading Blood engine…', `${remaining} dependencies remaining`);
         },
@@ -97,7 +114,7 @@
       preservePaths: true,
       onProgress(detail) {
         if (detail.phase !== 'mounting' || !detail.total) return;
-        ctx.setLoading('Mounting Blood data…', `${Math.floor(detail.copied * 100 / detail.total)}%`, 60 + detail.copied * 35 / detail.total);
+        ctx.setLoading('Preparing Blood…', `${Math.floor(detail.copied * 100 / detail.total)}%`, 60 + detail.copied * 35 / detail.total);
       }
     });
     engine.FS.chmod('/game', 0o555);
@@ -128,7 +145,7 @@
     window.clearInterval(telemetryTimer);
     telemetryTimer = window.setInterval(() => {
       const state = nativeState();
-      if (state !== ctx.shell.engineState()) ctx.setEngineState(state);
+      if (state !== ctx.shell.engineState()) synchronizeState(ctx, null, false);
       if (typeof engine?._NBlood_WasmControlsMask === 'function') {
         const mask = engine._NBlood_WasmControlsMask();
         document.documentElement.dataset.bloodControlsMask = String(mask);
@@ -163,12 +180,19 @@
           mountName: spec.path,
           validateCached: false,
           validate: async file => {
-            ctx.setLoading(`Verifying ${spec.path}…`);
+            ctx.setLoading('Preparing Blood…');
             if (await sha256Hex(file) !== spec.sha256) throw new Error(`${spec.path} failed SHA-256 verification.`);
           }
         }))
       });
       ctx.elements.canvas.addEventListener('contextmenu', event => event.preventDefault());
+      document.addEventListener('keyup', event => {
+        if (!started || (event.key !== 'Enter' && event.key !== 'Escape')) return;
+        queueMicrotask(() => synchronizeState(ctx, event, true));
+      });
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape') lastEscapeAt = performance.now();
+      }, true);
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden') flushPersistence();
         else void ctx.shell.resumeAudio();
@@ -184,15 +208,15 @@
     async start(ctx) {
       if (started) return;
       void ctx.shell.resumeAudio();
-      ctx.setLoading('Restoring Blood data…', '', 5);
+      ctx.setLoading('Preparing Blood…', '', 5);
       const data = await ctx.dataClient.load(ownerData, {
         onProgress(detail) {
-          if (detail.phase === 'checking-cache') ctx.setLoading(`Checking ${detail.key}…`);
+          if (detail.phase === 'checking-cache') ctx.setLoading('Preparing Blood…');
           if (detail.phase === 'downloading') {
             const percent = detail.total ? Math.floor(detail.received * 100 / detail.total) : 0;
-            ctx.setLoading(`Caching ${detail.key} from this container…`, `${percent}%`, Math.min(50, 5 + percent * 0.45));
+            ctx.setLoading('Preparing Blood…', `${percent}%`, Math.min(50, 5 + percent * 0.45));
           }
-          if (detail.phase === 'restored') ctx.setLoading(`Restored ${detail.key} from this browser…`);
+          if (detail.phase === 'restored') ctx.setLoading('Preparing Blood…');
         }
       });
       document.documentElement.dataset.wasmDataSource = data.entries.every(entry => entry.cached) ? 'cache' : 'container';
@@ -210,8 +234,11 @@
     },
 
     readEngineState() { return nativeState(); },
-    captureLost() {
-      if (started && typeof engine?._NBlood_WasmEnsureMenu === 'function') engine._NBlood_WasmEnsureMenu();
+    readCaptureIntent() { return captureIntent(); },
+    captureLost(_detail, ctx) {
+      if (started && performance.now() - lastEscapeAt > 750 &&
+          typeof engine?._NBlood_WasmEnsureMenu === 'function') engine._NBlood_WasmEnsureMenu();
+      if (started) synchronizeState(ctx, null, false);
     },
     inputCaptureChanged(captured) {
       document.documentElement.dataset.pointerLocked = String(captured);

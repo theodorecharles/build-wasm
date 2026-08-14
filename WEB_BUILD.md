@@ -85,7 +85,9 @@ second verified renderer profile exists:
 - 8-bit software rendering and pixelated presentation;
 - WASD reapplied after persisted configuration loads;
 - horizontal mouse look, while mouse Y preserves classic forward/back input;
-- native menu/gameplay/paused state and capture-loss menu hooks;
+- Blood native menu/gameplay/paused/debrief/loading state, New Game capture
+  intent, and synchronous capture-loss menu hooks;
+- Duke native menu/gameplay/paused state and capture-loss menu hooks;
 - SDL stereo and optional game-data music through Web Audio.
 
 Duke's desktop attract/menu function is a blocking loop. The browser port

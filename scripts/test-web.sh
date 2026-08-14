@@ -47,7 +47,7 @@ cmp "$framework_dir/dist/wasm-game-framework.css" "$dist_dir/shared-shell/wasm-g
 cmp "$framework_dir/dist/wasm-game-bootstrap.js" "$dist_dir/shared-shell/wasm-game-bootstrap.js"
 
 for marker in CONFIG_SetDefaultKeys 'gSetup.xdim = 800' 'gMouseAim = 0' \
-    NBlood_WasmRuntimeState NBlood_WasmEnsureMenu NBlood_WasmSetPointerLock NBlood_WasmControlsMask; do
+    NBlood_WasmRuntimeState NBlood_WasmCaptureIntent NBlood_WasmEnsureMenu NBlood_WasmSetPointerLock NBlood_WasmControlsMask; do
     rg -Fq "$marker" "$repo_dir/source/blood/src" || { printf 'Missing Blood native seam: %s\n' "$marker" >&2; exit 1; }
 done
 for marker in 'emscripten_set_main_loop(Duke_WasmFrame' Duke_WasmEnterFrontend Duke_WasmDrawFrontend \
@@ -56,7 +56,7 @@ for marker in 'emscripten_set_main_loop(Duke_WasmFrame' Duke_WasmEnterFrontend D
     Duke_WasmSetPointerLock Duke_WasmControlsMask; do
     rg -Fq "$marker" "$repo_dir/source/duke3d/src/game.cpp" || { printf 'Missing Duke native seam: %s\n' "$marker" >&2; exit 1; }
 done
-for marker in _NBlood_WasmRuntimeState _NBlood_WasmEnsureMenu _NBlood_WasmSetPointerLock _NBlood_WasmControlsMask; do
+for marker in _NBlood_WasmRuntimeState _NBlood_WasmCaptureIntent _NBlood_WasmEnsureMenu _NBlood_WasmSetPointerLock _NBlood_WasmControlsMask; do
     rg -Fq "$marker" "$dist_dir/blood.js" || { printf 'Blood native hook is not exported: %s\n' "$marker" >&2; exit 1; }
 done
 for marker in _Duke_WasmRuntimeState _Duke_WasmEnsureMenu _Duke_WasmSetPointerLock _Duke_WasmControlsMask; do
