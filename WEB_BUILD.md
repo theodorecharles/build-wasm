@@ -7,8 +7,8 @@ linked or preloaded. The only preload is tracked `nblood.pk3`, an engine
 resource needed by NBlood.
 
 The downstream owns no HTML, CSS, service worker, or web manifest. It installs
-the canonical browser package from exact wasm-game-framework 0.7.2 commit
-`e4b78d6`.
+the canonical browser package from exact wasm-game-framework 0.7.3 commit
+`be0b813`.
 
 ## Required game data
 
@@ -78,7 +78,8 @@ variants `blood` and `duke3d`.
 
 ## Classic profile
 
-Both titles expose only `classic`:
+Both titles use only `classic`; the launcher hides graphics controls until a
+second verified renderer profile exists:
 
 - fixed 800×600 contained at 4:3 with no stretch;
 - 8-bit software rendering and pixelated presentation;

@@ -15,6 +15,8 @@ cleanup() {
 trap cleanup EXIT
 
 node "$repo_dir/scripts/verify-site-contract.js"
+node "$repo_dir/scripts/test-variant-adapters.js"
+node "$framework_dir/scripts/check-game-package.js" "$repo_dir/build-web/dist"
 WASM_GAME_SITE_ROOT="$repo_dir/build-web/dist" \
 WASM_GAME_SHELL_ROOT="$framework_dir/dist" \
 WASM_GAME_DATA_ROOT="$data_dir" \
@@ -35,7 +37,7 @@ curl -fsS "$base/app.webmanifest?variant=blood" | rg -Fq '/blood-512.png'
 curl -fsS "$base/app.webmanifest?variant=duke3d" | rg -Fq '/duke3d-512.png'
 curl -sSI "$base/favicon.ico?variant=blood" | rg -Fiq 'location: /blood.ico'
 curl -sSI "$base/favicon.ico?variant=duke3d" | rg -Fiq 'location: /duke3d.ico'
-curl -fsS "$base/service-worker.js" | rg -Fq 'wasm-game-shell-0.7.2'
+curl -fsS "$base/service-worker.js" | rg -Fq 'wasm-game-shell-0.7.3'
 curl -fsS "$base/game-data/status?variant=blood" | rg -Fq '"ready":false'
 curl -fsS "$base/game-data/status?variant=duke3d" | rg -Fq '"ready":false'
 test "$(curl -sS -o /dev/null -w '%{http_code}' "$base/game-data/files/blood.rff?variant=blood")" = "409"

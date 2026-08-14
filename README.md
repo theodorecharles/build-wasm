@@ -12,12 +12,12 @@ locked-title images without embedding game data.
 ## Browser contract
 
 The downstream emits only declarative configuration, a family adapter, native
-artifacts, and tracked source icons. wasm-game-framework 0.7.2 at immutable
-commit `e4b78d6` owns HTML, CSS, the service worker, PWA manifests, fullscreen,
+artifacts, and tracked source icons. wasm-game-framework 0.7.3 at immutable
+commit `be0b813` owns HTML, CSS, the service worker, PWA manifests, fullscreen,
 input capture, launcher/loading/runtime state, `/data` provisioning, and
 origin-private IndexedDB caching.
 
-Both shipped profiles are honest classic ports: SDL2/Web Audio, the 8-bit
+Both shipped variants use one honest classic configuration: SDL2/Web Audio, the 8-bit
 software renderer, a fixed 800×600 4:3 backbuffer, WASD defaults, horizontal
 mouse turning, and classic mouse-Y forward/back movement. Polymost/WebGL is not
 advertised because renderer selection, dynamic resizing, and runtime behavior

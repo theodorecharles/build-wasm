@@ -27,6 +27,7 @@ for source in "$dist_dir/blood.js" "$dist_dir/duke3d.js" "$dist_dir/game-adapter
     node --check "$source"
 done
 node "$repo_dir/scripts/test-family-adapter.js"
+node "$repo_dir/scripts/test-variant-adapters.js"
 if command -v wasm-validate >/dev/null 2>&1; then
     wasm-validate "$dist_dir/blood.wasm"
     wasm-validate "$dist_dir/duke3d.wasm"

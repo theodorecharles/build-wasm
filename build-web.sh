@@ -6,8 +6,8 @@ build_dir="${BUILD_WASM_BUILD_DIR:-$repo_dir/build-web}"
 dist_dir="$build_dir/dist"
 framework_dir="${WASM_FRAMEWORK_DIR:-$repo_dir/../wasm-game-framework}"
 jobs="${BUILD_WASM_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '2')}"
-required_framework_version="0.7.2"
-required_framework_commit="e4b78d6"
+required_framework_version="0.7.3"
+required_framework_commit="be0b813"
 
 if ! command -v emcc >/dev/null 2>&1; then
     emsdk_dir="${EMSDK_DIR:-${EMSDK:-}}"
@@ -117,5 +117,6 @@ magick "$repo_dir/source/duke3d/rsrc/game_icon.ico[10]" -resize 192x192 "$dist_d
 magick "$repo_dir/source/duke3d/rsrc/game_icon.ico[10]" -resize 512x512 "$dist_dir/duke3d-512.png"
 
 "$framework_dir/scripts/install-browser-package.sh" "$dist_dir/shared-shell" copy
+node "$framework_dir/scripts/check-game-package.js" "$dist_dir"
 printf 'Built Blood and Duke Nukem 3D family site at %s (framework %s/%s).\n' \
     "$dist_dir" "$required_framework_version" "$required_framework_commit"
