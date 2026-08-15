@@ -17,6 +17,7 @@
   "variants": {
     "blood": {
       "title": "Blood",
+      "menuCursor": "none",
       "kicker": "Build Engine · NBlood native source",
       "engine": "NBlood / EDuke32 GPL source",
       "description": "Classic Blood at fixed 800×600 with horizontal-only mouse look.",
@@ -59,10 +60,7 @@
         "requestDurability": true
       },
       "controller": {
-        "mode": "wasdMouse",
-        "moveDeadzone": 0.18,
-        "lookDeadzone": 0.16,
-        "lookSensitivity": 0.62
+        "mode": "disabled"
       },
       "provisioningText": "Select the required files from a One Unit Whole Blood folder. Optional Cryptic Passage, movies, demos, and OGG tracks are accepted when selected together and cached in this browser.",
       "theme": {
@@ -73,6 +71,7 @@
     },
     "duke3d": {
       "title": "Duke Nukem 3D",
+      "menuCursor": "native",
       "kicker": "Build Engine · EDuke32 native source",
       "engine": "EDuke32 GPL source",
       "description": "Classic Duke Nukem 3D at fixed 800×600 with horizontal-only mouse look.",
@@ -115,10 +114,7 @@
         "requestDurability": true
       },
       "controller": {
-        "mode": "wasdMouse",
-        "moveDeadzone": 0.18,
-        "lookDeadzone": 0.16,
-        "lookSensitivity": 0.62
+        "mode": "disabled"
       },
       "provisioningText": "Select DUKE3D.GRP from the 1.3d game folder. DUKE.RTS is optional. Matching files are cached in this browser after exact validation.",
       "theme": {

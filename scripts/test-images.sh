@@ -45,3 +45,23 @@ smoke() {
 smoke build-wasm suite /blood-512.png blood.rff
 smoke blood-wasm blood /blood-512.png blood.rff
 smoke duke3d-wasm duke3d /duke3d-512.png duke3d.grp
+
+password_container="build-wasm-password-$$_suite"
+active_container="$password_container"
+docker run --rm -d --name "$password_container" -p 127.0.0.1::8088 \
+    -e WASM_GAME_PASSWORD='build-wasm-smoke-password' \
+    -v "$data_dir:/data" "${namespace}build-wasm:${tag}" >/dev/null
+password_port=""
+for _ in {1..100}; do
+    password_port="$(docker port "$password_container" 8088/tcp 2>/dev/null | sed -n 's/.*://p' | head -1)"
+    if [[ -n "$password_port" ]] && curl -fsS "http://127.0.0.1:$password_port/healthz" >/dev/null 2>&1; then break; fi
+    sleep 0.1
+done
+[[ -n "$password_port" ]]
+curl -fsS "http://127.0.0.1:$password_port/auth/status" | \
+    jq -e '.required == true and .authenticated == false' >/dev/null
+test "$(curl -sS -o /dev/null -w '%{http_code}' \
+    "http://127.0.0.1:$password_port/game-data/status?variant=blood")" = "401"
+docker stop "$password_container" >/dev/null
+active_container=""
+printf 'Verified optional password gate in %sbuild-wasm:%s.\n' "$namespace" "$tag"

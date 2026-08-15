@@ -8,6 +8,24 @@
   let telemetryTimer = 0;
   let lastEscapeAt = 0;
   let context = null;
+  let interactionCaptureIntent = false;
+
+  const browserScanCodes = Object.freeze({
+    Escape: 0x01, Digit1: 0x02, Digit2: 0x03, Digit3: 0x04, Digit4: 0x05, Digit5: 0x06,
+    Digit6: 0x07, Digit7: 0x08, Digit8: 0x09, Digit9: 0x0a, Digit0: 0x0b, Minus: 0x0c,
+    Equal: 0x0d, Backspace: 0x0e, Tab: 0x0f, KeyQ: 0x10, KeyW: 0x11, KeyE: 0x12,
+    KeyR: 0x13, KeyT: 0x14, KeyY: 0x15, KeyU: 0x16, KeyI: 0x17, KeyO: 0x18,
+    KeyP: 0x19, BracketLeft: 0x1a, BracketRight: 0x1b, Enter: 0x1c, ControlLeft: 0x1d,
+    KeyA: 0x1e, KeyS: 0x1f, KeyD: 0x20, KeyF: 0x21, KeyG: 0x22, KeyH: 0x23,
+    KeyJ: 0x24, KeyK: 0x25, KeyL: 0x26, Semicolon: 0x27, Quote: 0x28, Backquote: 0x29,
+    ShiftLeft: 0x2a, Backslash: 0x2b, KeyZ: 0x2c, KeyX: 0x2d, KeyC: 0x2e,
+    KeyV: 0x2f, KeyB: 0x30, KeyN: 0x31, KeyM: 0x32, Comma: 0x33, Period: 0x34,
+    Slash: 0x35, ShiftRight: 0x36, AltLeft: 0x38, Space: 0x39, F1: 0x3b, F2: 0x3c,
+    F3: 0x3d, F4: 0x3e, F5: 0x3f, F6: 0x40, F7: 0x41, F8: 0x42, F9: 0x43,
+    F10: 0x44, F11: 0x57, F12: 0x58, ControlRight: 0x9d, AltRight: 0xb8,
+    Home: 0xc7, ArrowUp: 0xc8, PageUp: 0xc9, ArrowLeft: 0xcb, ArrowRight: 0xcd,
+    End: 0xcf, ArrowDown: 0xd0, PageDown: 0xd1, Insert: 0xd2, Delete: 0xd3
+  });
 
   function diagnostics() {
     return globalThis.__bloodWasmDiagnostics = globalThis.__bloodWasmDiagnostics || {
@@ -24,12 +42,13 @@
 
   function nativeState() {
     if (!started || typeof engine?._NBlood_WasmRuntimeState !== 'function') return 'menu';
-    return ['menu', 'gameplay', 'paused', 'debrief', 'loading'][engine._NBlood_WasmRuntimeState()] || 'menu';
+    const state = ['menu', 'gameplay', 'paused', 'debrief', 'loading'][engine._NBlood_WasmRuntimeState()] || 'menu';
+    return state === 'menu' && interactionCaptureIntent ? 'loading' : state;
   }
 
   function captureIntent() {
-    return Boolean(started && typeof engine?._NBlood_WasmCaptureIntent === 'function' &&
-      engine._NBlood_WasmCaptureIntent());
+    return Boolean(started && (interactionCaptureIntent ||
+      (typeof engine?._NBlood_WasmCaptureIntent === 'function' && engine._NBlood_WasmCaptureIntent())));
   }
 
   function synchronizeState(ctx, event, captureGameplay) {
@@ -68,7 +87,8 @@
         print: (...args) => { console.log('[NBlood WASM]', ...args); ctx.log(args.join(' ')); },
         printErr: (...args) => {
           const line = args.join(' ');
-          if (/\b(error|fatal|abort|unreachable)\b/i.test(line)) {
+          const actionable = line.replace(/\b0\s+error(?:s|\(s\))?(?=\W|$)/gi, '');
+          if (/\b(error|fatal|abort|unreachable)\b/i.test(actionable)) {
             console.error('[NBlood WASM]', ...args);
             ctx.log(`ERROR: ${line}`);
           } else {
@@ -130,11 +150,30 @@
     window.clearInterval(telemetryTimer);
     telemetryTimer = window.setInterval(() => {
       const state = nativeState();
+      if (state === 'gameplay') interactionCaptureIntent = false;
+      else if (state === 'menu' && !engine?._NBlood_WasmCaptureTarget?.() && !engine?._NBlood_WasmCaptureIntent?.()) {
+        interactionCaptureIntent = false;
+      }
       if (state !== ctx.shell.engineState()) synchronizeState(ctx, null, false);
       if (typeof engine?._NBlood_WasmControlsMask === 'function') {
         const mask = engine._NBlood_WasmControlsMask();
         document.documentElement.dataset.bloodControlsMask = String(mask);
         document.documentElement.dataset.bloodControlsValid = String(mask === 31);
+      }
+      if (typeof engine?._Build_WasmRenderMode === 'function') {
+        document.documentElement.dataset.buildRenderMode = String(engine._Build_WasmRenderMode());
+        document.documentElement.dataset.buildRenderSize = `${engine._Build_WasmRenderWidth()}x${engine._Build_WasmRenderHeight()}`;
+        document.documentElement.dataset.buildRenderBpp = String(engine._Build_WasmRenderBpp());
+      }
+      if (typeof engine?._Build_WasmPointerClickState === 'function') {
+        document.documentElement.dataset.buildNativePointer = `${engine._Build_WasmPointerX()},${engine._Build_WasmPointerY()}`;
+        document.documentElement.dataset.buildNativePointerBits = String(engine._Build_WasmPointerBits());
+        document.documentElement.dataset.buildNativeClickState = String(engine._Build_WasmPointerClickState());
+      }
+      if (typeof engine?._Build_WasmPointerDeltaEvents === 'function') {
+        document.documentElement.dataset.buildPointerDelta =
+          `${engine._Build_WasmPointerDeltaX()},${engine._Build_WasmPointerDeltaY()}`;
+        document.documentElement.dataset.buildPointerDeltaEvents = String(engine._Build_WasmPointerDeltaEvents());
       }
       const audioContext = engine?.SDL2?.audioContext;
       if (audioContext) document.documentElement.dataset.audioState = audioContext.state;
@@ -213,6 +252,28 @@
         }))
       });
       ctx.elements.canvas.addEventListener('contextmenu', event => event.preventDefault());
+      const publishKey = (event, pressed) => {
+        const scan = browserScanCodes[event.code];
+        document.documentElement.dataset.buildLastKey = `${event.code || 'unknown'}:${pressed ? 'down' : 'up'}`;
+        if (scan == null || typeof engine?._Build_WasmKeyEvent !== 'function') return;
+        document.documentElement.dataset.buildLastScan = String(scan);
+        engine._Build_WasmKeyEvent(scan, pressed ? 1 : 0);
+        if (pressed && event.code === 'Enter' && nativeState() === 'menu' && engine?._NBlood_WasmCaptureTarget?.()) {
+          interactionCaptureIntent = true;
+        }
+        if (pressed && event.code === 'Escape') interactionCaptureIntent = false;
+        event.stopPropagation();
+        if (nativeState() !== 'gameplay' && !event.ctrlKey && !event.metaKey && !event.altKey) event.preventDefault();
+      };
+      ctx.elements.canvas.addEventListener('keydown', event => publishKey(event, true));
+      ctx.elements.canvas.addEventListener('keyup', event => publishKey(event, false));
+      ctx.elements.canvas.addEventListener('mousedown', event => event.stopImmediatePropagation(), true);
+      ctx.elements.canvas.addEventListener('mouseup', event => event.stopImmediatePropagation(), true);
+      // The adapter owns menu input and framework-normalized relative gameplay
+      // deltas. Suppress SDL's parallel compatibility event path so
+      // menuCursor:none cannot wake a native menu cursor and locked movement
+      // is never applied twice.
+      ctx.elements.canvas.addEventListener('mousemove', event => event.stopImmediatePropagation(), true);
       document.addEventListener('keyup', event => {
         if (!started || (event.key !== 'Enter' && event.key !== 'Escape')) return;
         queueMicrotask(() => synchronizeState(ctx, event, true));
@@ -265,11 +326,29 @@
 
     readEngineState() { return nativeState(); },
     readCaptureIntent() { return captureIntent(); },
+    pointerMove(detail) {
+      if (!started) return;
+      if (detail.captured === true) {
+        engine?._Build_WasmPointerDelta?.(Math.round(detail.movementX || 0), Math.round(detail.movementY || 0));
+        return;
+      }
+      if (nativeState() === 'gameplay') return;
+      engine?._Build_WasmPointerMove?.(Math.round(detail.x), Math.round(detail.y));
+    },
+    pointerButton(detail) {
+      if (!started || nativeState() === 'gameplay') return;
+      if (detail.button === 0 && detail.pressed && nativeState() === 'menu' && engine?._NBlood_WasmCaptureTarget?.()) {
+        interactionCaptureIntent = true;
+      }
+      engine?._Build_WasmPointerMove?.(Math.round(detail.x), Math.round(detail.y));
+      engine?._Build_WasmPointerButton?.(detail.button, detail.pressed ? 1 : 0);
+    },
     controllerFrame(detail) { controllerFrame(detail); },
     controllerChanged(detail) { if (detail.activeIndex == null || detail.selection === 'disabled') releaseController(); },
     captureLost(_detail, ctx) {
       if (started && performance.now() - lastEscapeAt > 750 &&
           typeof engine?._NBlood_WasmEnsureMenu === 'function') engine._NBlood_WasmEnsureMenu();
+      interactionCaptureIntent = false;
       if (started) synchronizeState(ctx, null, false);
     },
     inputCaptureChanged(captured) {

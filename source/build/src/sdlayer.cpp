@@ -1881,12 +1881,21 @@ int32_t videoSetMode(int32_t x, int32_t y, int32_t c, int32_t fs)
             int32_t value;
         } sdlayer_gl_attributes[] =
         {
+#ifdef __EMSCRIPTEN__
+              // WebGL 2 exposes an OpenGL ES 3 context. Robust-access and
+              // reset-notification flags are desktop context attributes and
+              // make Emscripten's EGL context creation fail outright.
+              { SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES },
+              { SDL_GL_CONTEXT_MAJOR_VERSION, 3 },
+              { SDL_GL_CONTEXT_MINOR_VERSION, 0 },
+#else
               { SDL_GL_CONTEXT_FLAGS,
 #ifndef NDEBUG
               SDL_GL_CONTEXT_DEBUG_FLAG |
 #endif
               SDL_GL_CONTEXT_ROBUST_ACCESS_FLAG },
               { SDL_GL_CONTEXT_RESET_NOTIFICATION, SDL_GL_CONTEXT_RESET_LOSE_CONTEXT },
+#endif
               { SDL_GL_DOUBLEBUFFER, 1 },
 
               { SDL_GL_STENCIL_SIZE, 1 },

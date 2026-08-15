@@ -263,15 +263,16 @@ void (*keypresscallback)(int32_t, int32_t);
 
 void keySetCallback(void (*callback)(int32_t, int32_t)) { keypresscallback = callback; }
 
-int32_t keyGetState(int32_t key) { return keystatus[g_keyRemapTable[key]]; }
+int32_t keyGetState(int32_t key) { return keystatus[(uint8_t)g_keyRemapTable[key]]; }
 
 void keySetState(int32_t key, int32_t state)
 {
-    keystatus[g_keyRemapTable[key]] = state;
+    uint8_t const remapped = (uint8_t)g_keyRemapTable[key];
+    keystatus[remapped] = state;
 
     if (state)
     {
-        g_keyFIFO[g_keyFIFOend] = g_keyRemapTable[key];
+        g_keyFIFO[g_keyFIFOend] = remapped;
         g_keyFIFO[(g_keyFIFOend+1)&(KEYFIFOSIZ-1)] = state;
         g_keyFIFOend = ((g_keyFIFOend+2)&(KEYFIFOSIZ-1));
     }
@@ -324,6 +325,12 @@ uint8_t g_mouseClickState;
 #ifdef __EMSCRIPTEN__
 static int32_t g_wasmControllerMouseBits;
 static uint32_t g_wasmControllerKeys;
+static uint8_t g_wasmKeyRelease[NUMKEYS];
+static uint8_t g_wasmMouseRelease[3];
+static uint32_t g_wasmInputFrames;
+static int32_t g_wasmPointerDeltaX;
+static int32_t g_wasmPointerDeltaY;
+static uint32_t g_wasmPointerDeltaEvents;
 
 static void wasmControllerKey(uint32_t const bit, int32_t const scan, uint32_t const next)
 {
@@ -348,6 +355,100 @@ extern "C" EMSCRIPTEN_KEEPALIVE void Build_WasmControllerFrame(
     g_mousePos.x += mouseX;
     g_mousePos.y += mouseY;
 }
+
+extern "C" EMSCRIPTEN_KEEPALIVE void Build_WasmKeyEvent(int32_t const scan, int32_t const pressed)
+{
+    if ((uint32_t)scan >= NUMKEYS)
+        return;
+
+    if (pressed)
+    {
+        g_wasmKeyRelease[scan] = 0;
+        keySetState(scan, 1);
+    }
+    else
+    {
+        // Browser automation and very quick taps can deliver keydown+keyup
+        // before the next native frame. Keep the press visible for one full
+        // engine frame, then release it on the following frame.
+        g_wasmKeyRelease[scan] = 2;
+    }
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void Build_WasmInputFrame(void)
+{
+    ++g_wasmInputFrames;
+    for (int32_t scan = 0; scan < NUMKEYS; ++scan)
+        if (g_wasmKeyRelease[scan] && --g_wasmKeyRelease[scan] == 0)
+            keySetState(scan, 0);
+
+    for (int32_t button = 0; button < 3; ++button)
+        if (g_wasmMouseRelease[button] && --g_wasmMouseRelease[button] == 0)
+        {
+            g_mouseBits &= ~(1 << button);
+            if (button == 0)
+                g_mouseClickState = MOUSE_RELEASED;
+        }
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void Build_WasmPointerMove(int32_t const x, int32_t const y)
+{
+    g_mouseAbs.x = clamp(x, 0, max(0, xres - 1));
+    g_mouseAbs.y = clamp(y, 0, max(0, yres - 1));
+    g_mouseInsideWindow = true;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void Build_WasmPointerDelta(int32_t const x, int32_t const y)
+{
+    // The framework owns pointer lock and forwards movementX/movementY while
+    // captured. Feed those relative deltas into the same accumulator that the
+    // desktop SDL event path uses; never reinterpret absolute menu positions
+    // as gameplay motion.
+    g_mousePos.x += x;
+    g_mousePos.y += y;
+    g_wasmPointerDeltaX = x;
+    g_wasmPointerDeltaY = y;
+    ++g_wasmPointerDeltaEvents;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void Build_WasmPointerButton(int32_t const button, int32_t const pressed)
+{
+    int32_t mapped = -1;
+    switch (button)
+    {
+        case 0: mapped = 0; break;
+        case 1: mapped = 2; break;
+        case 2: mapped = 1; break;
+    }
+
+    if (mapped < 0)
+        return;
+
+    if (pressed)
+    {
+        g_wasmMouseRelease[mapped] = 0;
+        g_mouseBits |= 1 << mapped;
+    }
+    else
+        g_wasmMouseRelease[mapped] = 2;
+
+    if (button == 0 && pressed)
+        g_mouseClickState = MOUSE_PRESSED;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmRenderMode(void) { return videoGetRenderMode(); }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmRenderWidth(void) { return xres; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmRenderHeight(void) { return yres; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmRenderBpp(void) { return bpp; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmPointerX(void) { return g_mouseAbs.x; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmPointerY(void) { return g_mouseAbs.y; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmPointerBits(void) { return g_mouseBits; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmPointerClickState(void) { return g_mouseClickState; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmPointerReleaseCountdown(void) { return g_wasmMouseRelease[0]; }
+extern "C" EMSCRIPTEN_KEEPALIVE unsigned Build_WasmInputFrameCount(void) { return g_wasmInputFrames; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmPointerDeltaX(void) { return g_wasmPointerDeltaX; }
+extern "C" EMSCRIPTEN_KEEPALIVE int Build_WasmPointerDeltaY(void) { return g_wasmPointerDeltaY; }
+extern "C" EMSCRIPTEN_KEEPALIVE unsigned Build_WasmPointerDeltaEvents(void) { return g_wasmPointerDeltaEvents; }
 #endif
 
 bool g_mouseEnabled;

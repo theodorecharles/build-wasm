@@ -52,6 +52,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #ifdef __EMSCRIPTEN__
 # include <emscripten.h>
+extern "C" void Build_WasmInputFrame(void);
 #endif
 
 // Uncomment to prevent anything except mirrors from drawing. It is sensible to
@@ -138,6 +139,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE int Duke_WasmControlsMask(void)
     if (ud.config.KeyboardKeys[gamefunc_Strafe_Right][0] == sc_D) mask |= 8;
     if (!ud.mouseaiming) mask |= 16;
     return mask;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int Duke_WasmMenuId(void)
+{
+    return m_currentMenu != nullptr ? m_currentMenu->menuID : -1;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int Duke_WasmMenuEntry(void)
+{
+    if (m_currentMenu == nullptr || m_currentMenu->type != Menu)
+        return -1;
+
+    return static_cast<MenuMenu_t *>(m_currentMenu->object)->currentEntry;
 }
 #endif
 
@@ -6714,6 +6728,7 @@ static bool Duke_WasmBeginLoop(void)
 
 static void Duke_WasmFrame(void)
 {
+    Build_WasmInputFrame();
     if (g_dukeWasmRestartLoop)
     {
         if (!Duke_WasmBeginLoop())
@@ -6915,11 +6930,17 @@ int app_main(int argc, char const* const* argv)
     CONFIG_ReadSetup();
 #ifdef __EMSCRIPTEN__
     // The classic browser contract is fixed and must not inherit a desktop
-    // fullscreen or renderer selection from persistent configuration.
+    // fullscreen or renderer selection from persistent configuration. OpenGL
+    // probe builds keep the same safe initial size but actually enter Polymost.
     ud.setup.fullscreen = 0;
     ud.setup.xdim = 800;
     ud.setup.ydim = 600;
+# ifdef USE_OPENGL
+    ud.setup.bpp = 32;
+    glrendmode = REND_POLYMOST;
+# else
     ud.setup.bpp = 8;
+# endif
     ud.setup.usemouse = 1;
 #endif
 

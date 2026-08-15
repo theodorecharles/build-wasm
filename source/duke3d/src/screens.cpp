@@ -55,16 +55,29 @@ static void G_HandleEventsWhileNoInput(void)
 {
     I_ClearAllInput();
 
+#ifdef __EMSCRIPTEN__
+    // Browser input callbacks cannot run while this native frame owns the
+    // JavaScript event loop. The desktop modal wait would therefore never
+    // observe a trigger in WebAssembly.
+    return;
+#else
     while (!I_GeneralTrigger())
         gameHandleEvents();
 
     I_ClearAllInput();
+#endif
 }
 
 static int32_t G_PlaySoundWhileNoInput(int32_t soundnum)
 {
     auto const voice = S_PlaySound(soundnum);
     I_ClearAllInput();
+#ifdef __EMSCRIPTEN__
+    // Let Web Audio finish asynchronously after this frame yields. Waiting
+    // here would prevent its completion callback from ever running.
+    (void)voice;
+    return 0;
+#else
     while (FX_SoundActive(voice))
     {
         gameHandleEvents();
@@ -76,6 +89,7 @@ static int32_t G_PlaySoundWhileNoInput(int32_t soundnum)
     }
 
     return 0;
+#endif
 }
 #endif
 //////////

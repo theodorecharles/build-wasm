@@ -74,6 +74,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 #ifdef __EMSCRIPTEN__
 # include <emscripten.h>
+extern "C" void Build_WasmInputFrame(void);
 
 extern "C" EMSCRIPTEN_KEEPALIVE void NBlood_WasmFlushPersistence(void)
 {
@@ -123,6 +124,21 @@ extern "C" EMSCRIPTEN_KEEPALIVE int NBlood_WasmRuntimeState(void)
 extern "C" EMSCRIPTEN_KEEPALIVE int NBlood_WasmCaptureIntent(void)
 {
     return gStartNewGame != 0;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int NBlood_WasmCaptureTarget(void)
+{
+    if (!gGameMenuMgr.m_bActive || gGameMenuMgr.pActiveMenu == nullptr)
+        return 0;
+
+    CGameMenu const * const menu = gGameMenuMgr.pActiveMenu;
+    // The five stock difficulty rows start immediately. The Custom submenu's
+    // START GAME row is the sixth item after its title and four sliders.
+    if (menu == &menuDifficulty)
+        return menu->m_nFocus >= 1 && menu->m_nFocus <= 5;
+    if (menu == &menuDifficultyCustom)
+        return menu->m_nFocus == 5;
+    return 0;
 }
 
 extern "C" EMSCRIPTEN_KEEPALIVE void NBlood_WasmEnsureMenu(void)
@@ -2028,6 +2044,7 @@ RESTART:
 #endif
     {
 #ifdef __EMSCRIPTEN__
+        Build_WasmInputFrame();
         if (gQuitGame)
         {
             LOG_F(INFO, "[NBlood WASM] Browser game loop stopped");

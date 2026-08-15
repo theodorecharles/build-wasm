@@ -12,19 +12,17 @@ locked-title images without embedding game data.
 ## Browser contract
 
 The downstream emits only declarative configuration, a family adapter, native
-artifacts, and tracked source icons. wasm-game-framework 0.9.1 at immutable
-commit `68bfbd1dbc0104084c7760e486b7437d4c7bb90e` owns HTML, CSS, the service
+artifacts, and tracked source icons. wasm-game-framework 0.9.2 at immutable
+commit `53bc7e6eeef1ae35dcf3b25dea4e3ec0ab46726f` owns HTML, CSS, the service
 worker, PWA manifests, fullscreen,
 input capture, launcher/loading/runtime state, `/data` provisioning, and
-origin-private IndexedDB caching. It also owns the launch-card USB/Bluetooth
-controller selection and durable browser lifecycle for saves, configuration,
-and keybindings. The variant adapters translate normalized controller frames
-into native Build keyboard/mouse state; no synthetic DOM input is used.
+origin-private IndexedDB caching. It also owns the durable browser lifecycle
+for saves, configuration, and keybindings. Controller support is currently
+disabled for both variants.
 
 Both shipped variants use one honest classic configuration: SDL2/Web Audio, the 8-bit
 software renderer, a fixed 800×600 4:3 backbuffer, WASD defaults, horizontal
-mouse turning, classic mouse-Y forward/back movement, and optional gamepad
-WASD/mouse controls. Blood saves/configuration use
+mouse turning, and classic mouse-Y forward/back movement. Blood saves/configuration use
 `/home/web_user/.config/nblood`; Duke uses
 `/home/web_user/.config/eduke32`. Both mount through framework IDBFS before
 native startup and flush on lifecycle transitions. Polymost/WebGL is not
@@ -43,6 +41,7 @@ for the relationship to the preserved `blood-wasm` repository.
 
 Each image requires a persistent `/data` mount. Required game files stay
 outside Git, image layers, and the public document root.
+Set `WASM_GAME_PASSWORD` to enable the framework's optional launch password.
 
 ## Native-source provenance
 

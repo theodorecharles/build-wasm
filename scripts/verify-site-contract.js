@@ -18,13 +18,13 @@ const variants = ['blood', 'duke3d'];
 const statusDocs = ['README.md', 'RUNBOOK.md'].map(filename =>
   fs.readFileSync(path.join(repo, filename), 'utf8'));
 
-assert.equal(JSON.parse(fs.readFileSync(path.join(framework, 'package.json'), 'utf8')).version, '0.9.1');
-assert.equal(childProcess.execFileSync('git', ['-C', framework, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), '68bfbd1dbc0104084c7760e486b7437d4c7bb90e');
+assert.equal(JSON.parse(fs.readFileSync(path.join(framework, 'package.json'), 'utf8')).version, '0.9.2');
+assert.equal(childProcess.execFileSync('git', ['-C', framework, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), '53bc7e6eeef1ae35dcf3b25dea4e3ec0ab46726f');
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wasm-game-framework.js')), true);
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wasm-game-bootstrap.js')), true);
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wolfwasm-shell.js')), false);
 if (fs.existsSync(dist)) {
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dist, 'shared-shell', 'wasm-game-framework.json'), 'utf8')).version, '0.9.1');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dist, 'shared-shell', 'wasm-game-framework.json'), 'utf8')).version, '0.9.2');
 }
 
 for (const contents of statusDocs) {
@@ -122,4 +122,4 @@ for (const source of [bloodAdapter, dukeAdapter]) {
   assert.match(source, /preservePaths: true/);
 }
 
-console.log('Verified framework 0.9.1, persistence, controllers, family dispatch, fixed classic profiles, PWA metadata, and exact data contracts.');
+console.log('Verified framework 0.9.2, persistence, controllers, family dispatch, fixed classic profiles, PWA metadata, and exact data contracts.');

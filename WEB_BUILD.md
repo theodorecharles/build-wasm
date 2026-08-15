@@ -7,8 +7,8 @@ linked or preloaded. The only preload is tracked `nblood.pk3`, an engine
 resource needed by NBlood.
 
 The downstream owns no HTML, CSS, service worker, or web manifest. It installs
-the canonical browser package from exact wasm-game-framework 0.9.1 commit
-`68bfbd1dbc0104084c7760e486b7437d4c7bb90e`.
+the canonical browser package from exact wasm-game-framework 0.9.2 commit
+`53bc7e6eeef1ae35dcf3b25dea4e3ec0ab46726f`.
 
 ## Required game data
 

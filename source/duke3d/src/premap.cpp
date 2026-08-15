@@ -1422,9 +1422,16 @@ void G_NewGame(int volumeNum, int levelNum, int skillNum)
 
     if (ud.skill_voice > 0 && ud.config.SoundToggle)
     {
+#ifdef __EMSCRIPTEN__
+        // The desktop path blocks here until the difficulty voice finishes.
+        // Browser audio completion needs the event loop that this synchronous
+        // wait would occupy, so it can never make forward progress.
+        ud.skill_voice = -1;
+#else
         // this is not an error
         while (ud.skill_voice > 0 && !FX_SoundActive(ud.skill_voice)) gameHandleEvents();
         while (ud.skill_voice > 0 && FX_SoundActive(ud.skill_voice)) gameHandleEvents();
+#endif
     }
 
     S_PauseSounds(false);
@@ -2008,7 +2015,6 @@ int G_EnterLevel(int gameMode)
                     // the STAT_NETALLOC sprites allocated yet.
 
     Net_NotifyNewGame();
-
 
     prelevel(gameMode);
 

@@ -29,6 +29,7 @@ extern CGameMenu menuNetMain;
 extern CGameMenu menuNetStart;
 extern CGameMenu menuEpisode;
 extern CGameMenu menuDifficulty;
+extern CGameMenu menuDifficultyCustom;
 extern CGameMenu menuOptionsOld;
 extern CGameMenu menuControls;
 extern CGameMenu menuMessages;
