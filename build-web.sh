@@ -6,8 +6,8 @@ build_dir="${BUILD_WASM_BUILD_DIR:-$repo_dir/build-web}"
 dist_dir="$build_dir/dist"
 framework_dir="${WASM_FRAMEWORK_DIR:-$repo_dir/../wasm-game-framework}"
 jobs="${BUILD_WASM_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '2')}"
-required_framework_version="0.7.3"
-required_framework_commit="be0b813"
+required_framework_version="0.7.5"
+required_framework_commit="11b9af4"
 
 if ! command -v emcc >/dev/null 2>&1; then
     emsdk_dir="${EMSDK_DIR:-${EMSDK:-}}"

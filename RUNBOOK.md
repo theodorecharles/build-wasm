@@ -12,7 +12,7 @@ game data or generated WebAssembly artifacts to Git.
 ## Architecture
 
 ```text
-wasm-game-framework 0.7.3 canonical document/server/PWA
+wasm-game-framework 0.7.5 canonical document/server/PWA
         |
 Build family config + variant adapter dispatch
         |
