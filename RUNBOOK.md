@@ -12,7 +12,7 @@ game data or generated WebAssembly artifacts to Git.
 ## Architecture
 
 ```text
-wasm-game-framework 0.7.6 canonical document/server/PWA
+wasm-game-framework 0.8.0 canonical document/server/PWA, persistence, and controller layer
         |
 Build family config + variant adapter dispatch
         |
@@ -24,9 +24,20 @@ native NBlood or EDuke32 + Build software renderer + SDL2/Web Audio
 ```
 
 The downstream owns no HTML, CSS, service worker, or web manifest. Fullscreen
-preference, launcher state, input capture, PWA metadata, and provisioning are
-framework contracts. Blood persists under `/home/web_user/.config/nblood`;
-Duke persists under `/home/web_user/.config/eduke32`.
+preference, launcher state, input capture, PWA metadata, controller discovery,
+and provisioning are framework contracts. Blood persists under
+`/home/web_user/.config/nblood`; Duke persists under
+`/home/web_user/.config/eduke32`. Each adapter attaches the framework's IDBFS
+manager before `callMain`, asks native code to write configuration before a
+flush, and lets the framework handle debounce, periodic save, page hide, and
+hard reload restoration.
+
+Controller mode is `wasdMouse`. The launch card owns USB/Bluetooth discovery,
+stable device selection, deadzones, and normalized actions. The variant
+adapter maps left stick to native WASD, right stick to native relative mouse,
+triggers/buttons to native actions, and directional/menu buttons to native
+menu keys. Disconnecting or disabling a controller explicitly releases every
+held native action.
 
 Duke's browser front end draws the native menu cooperatively instead of
 entering the desktop blocking attract loop. Native menu choices still launch
@@ -66,6 +77,9 @@ Once granted, test each variant with the required data files:
    gated container transfer.
 7. Change settings, save, reload, and verify IDBFS persistence.
 8. Verify remembered Launch fullscreen behavior in suite and locked images.
+9. Select Auto-detect, connect a USB or Bluetooth controller, and verify left
+   stick movement, right-stick turning, attack/jump, menu navigation, hot
+   unplug with no stuck action, and remembered selection after reload.
 
 ## Known blocker
 

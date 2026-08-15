@@ -6,6 +6,7 @@
   let started = false;
   let runtimePromise = null;
   let telemetryTimer = 0;
+  let context = null;
 
   function nativeState() {
     if (!started || typeof engine?._Duke_WasmRuntimeState !== 'function') return 'menu';
@@ -34,33 +35,17 @@
       engine = globalThis.Module = {
         canvas: ctx.elements.canvas,
         noInitialRun: true,
-        preRun: [() => {
-          const persistentDirectory = '/home/web_user/.config/eduke32';
-          const dependency = 'duke3d-idbfs';
-          let dependencyAdded = false;
-          document.documentElement.dataset.persistence = 'loading';
-          try {
-            engine.FS.filesystems.IDBFS.onAutoPersistStateChanged = active => {
-              document.documentElement.dataset.persistence = active ? 'saving' : 'ready';
-            };
-            engine.FS.mkdirTree(persistentDirectory);
-            engine.FS.mount(engine.FS.filesystems.IDBFS, { autoPersist: true }, persistentDirectory);
-            engine.addRunDependency(dependency);
-            dependencyAdded = true;
-            engine.FS.syncfs(true, error => {
-              document.documentElement.dataset.persistence = error ? 'unavailable' : 'ready';
-              if (error) ctx.log(`Persistent storage unavailable: ${error}`);
-              else ctx.log('Persistent Duke settings and saves loaded.');
-              engine.removeRunDependency(dependency);
-            });
-          } catch (error) {
-            if (dependencyAdded) engine.removeRunDependency(dependency);
-            document.documentElement.dataset.persistence = 'unavailable';
-            ctx.log(`Could not initialize persistent storage: ${error}`);
-          }
-        }],
         print: (...args) => { console.log('[Duke WASM]', ...args); ctx.log(args.join(' ')); },
-        printErr: (...args) => { console.error('[Duke WASM]', ...args); ctx.log(`ERROR: ${args.join(' ')}`); },
+        printErr: (...args) => {
+          const line = args.join(' ');
+          if (/\b(error|fatal|abort|unreachable)\b/i.test(line)) {
+            console.error('[Duke WASM]', ...args);
+            ctx.log(`ERROR: ${line}`);
+          } else {
+            console.log('[Duke WASM]', ...args);
+            ctx.log(line);
+          }
+        },
         setStatus: message => { if (message) ctx.setLoading('Preparing Duke Nukem 3D…'); },
         monitorRunDependencies: remaining => {
           if (remaining) ctx.setLoading('Preparing Duke Nukem 3D…');
@@ -96,10 +81,54 @@
     if (!started) return;
     try { engine?._Duke_WasmFlushPersistence?.(); }
     catch (error) { console.warn('[Duke WASM] Could not flush configuration', error); }
+    context?.persistence?.markDirty();
+    void context?.persistence?.save();
+  }
+
+  function controllerFrame(detail) {
+    if (!started || typeof engine?._Build_WasmControllerFrame !== 'function') return;
+    const actions = detail.actions || {};
+    const menu = nativeState() !== 'gameplay';
+    let keys = 0;
+    const held = (name, threshold = 0.4) => Number(actions[name]) > threshold;
+    if (menu) {
+      if (held('forward') || held('up')) keys |= 1 << 11;
+      if (held('backward') || held('down')) keys |= 1 << 12;
+      if (held('left')) keys |= 1 << 13;
+      if (held('right')) keys |= 1 << 14;
+      if (held('jump') || held('attack')) keys |= 1 << 7;
+      if (held('crouch') || held('menu')) keys |= 1 << 10;
+    } else {
+      if (held('forward')) keys |= 1 << 0;
+      if (held('backward')) keys |= 1 << 1;
+      if (held('left')) keys |= 1 << 2;
+      if (held('right')) keys |= 1 << 3;
+      if (held('jump')) keys |= 1 << 4;
+      if (held('crouch')) keys |= 1 << 5;
+      if (held('reload')) keys |= 1 << 6;
+      if (held('sprint')) keys |= 1 << 8;
+      if (held('scoreboard')) keys |= 1 << 9;
+      if (held('menu')) keys |= 1 << 10;
+      if (held('melee')) keys |= 1 << 15;
+    }
+    let mouse = 0;
+    if (!menu && held('attack')) mouse |= 1;
+    if (!menu && held('altAttack')) mouse |= 2;
+    if (!menu && held('previousWeapon')) mouse |= 16;
+    if (!menu && held('nextWeapon')) mouse |= 32;
+    const scale = Math.max(1, detail.deltaMs || 16);
+    engine._Build_WasmControllerFrame(keys,
+      menu ? 0 : Math.round(Number(actions.lookX || 0) * scale),
+      menu ? 0 : Math.round(Number(actions.lookY || 0) * scale), mouse);
+  }
+
+  function releaseController() {
+    engine?._Build_WasmControllerFrame?.(0, 0, 0, 0);
   }
 
   globalThis.WasmGameAdapter = Object.freeze({
     async init(ctx) {
+      context = ctx;
       document.documentElement.dataset.audioState = 'not-created';
       document.documentElement.dataset.persistence = 'not-started';
       const manifest = await fetch('/wasm-game-data.json', { cache: 'no-store' }).then(response => {
@@ -145,6 +174,9 @@
       document.documentElement.dataset.wasmDataSource = data.entries.every(entry => entry.cached) ? 'cache' : 'container';
       ctx.setLoading('Preparing Duke Nukem 3D…', '', 55);
       await loadEngine(ctx);
+      document.documentElement.dataset.persistence = 'loading';
+      await ctx.persistence.attach(engine.FS, { root: ctx.persistence.root });
+      document.documentElement.dataset.persistence = 'ready';
       await ctx.framework.mountOwnerFiles(engine, data, {
         root: '/game',
         mode: 'memfs',
@@ -165,6 +197,8 @@
     },
 
     readEngineState() { return nativeState(); },
+    controllerFrame(detail) { controllerFrame(detail); },
+    controllerChanged(detail) { if (detail.activeIndex == null || detail.selection === 'disabled') releaseController(); },
     captureLost() {
       if (started && typeof engine?._Duke_WasmEnsureMenu === 'function') engine._Duke_WasmEnsureMenu();
     },

@@ -46,6 +46,8 @@
     inputCaptureChanged(captured, context) { return delegate?.inputCaptureChanged?.(captured, context); },
     pointerMove(detail, event, context) { return delegate?.pointerMove?.(detail, event, context); },
     pointerButton(detail, event, context) { return delegate?.pointerButton?.(detail, event, context); },
+    controllerFrame(detail, context) { return delegate?.controllerFrame?.(detail, context); },
+    controllerChanged(detail, context) { return delegate?.controllerChanged?.(detail, context); },
     preferencesChanged(values, context) { return delegate?.preferencesChanged?.(values, context); },
     contextLost(event, context) { return delegate?.contextLost?.(event, context); },
     contextRestored(event, context) { return delegate?.contextRestored?.(event, context); }

@@ -5,10 +5,10 @@ repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 framework_dir="${WASM_FRAMEWORK_DIR:-$repo_dir/../wasm-game-framework}"
 namespace="${DOCKER_NAMESPACE:-}"
 tag="${DOCKER_TAG:-dev}"
-required_framework_version="0.7.6"
-required_framework_commit="e617f090deaa294dacd033afa52c09f811a3e690"
+required_framework_version="0.8.0"
+required_framework_commit="3aef7e84f2accde01a04eb4e7398f38132c992fc"
 framework_version="$(node -p "require('${framework_dir}/package.json').version")"
-framework_commit="$(git -C "$framework_dir" rev-parse --short=7 HEAD)"
+framework_commit="$(git -C "$framework_dir" rev-parse HEAD)"
 
 if [[ "$framework_version" != "$required_framework_version" || "$framework_commit" != "$required_framework_commit" ]]; then
     printf 'Build WASM requires wasm-game-framework %s at %s; found %s at %s.\n' \

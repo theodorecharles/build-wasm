@@ -59,6 +59,10 @@ done
 for marker in _NBlood_WasmRuntimeState _NBlood_WasmCaptureIntent _NBlood_WasmEnsureMenu _NBlood_WasmSetPointerLock _NBlood_WasmControlsMask; do
     rg -Fq "$marker" "$dist_dir/blood.js" || { printf 'Blood native hook is not exported: %s\n' "$marker" >&2; exit 1; }
 done
+for generated in "$dist_dir/blood.js" "$dist_dir/duke3d.js"; do
+    rg -Fq '_Build_WasmControllerFrame' "$generated" || { printf 'Native controller seam is not exported: %s\n' "$generated" >&2; exit 1; }
+done
+rg -Fq 'Build_WasmControllerFrame' "$repo_dir/source/build/src/baselayer.cpp"
 for marker in _Duke_WasmRuntimeState _Duke_WasmEnsureMenu _Duke_WasmSetPointerLock _Duke_WasmControlsMask; do
     rg -Fq "$marker" "$dist_dir/duke3d.js" || { printf 'Duke native hook is not exported: %s\n' "$marker" >&2; exit 1; }
 done
@@ -66,7 +70,8 @@ rg -Fq '#define DUKE13_CRC  (int32_t)0xBBC9CE44' "$repo_dir/source/duke3d/src/gr
 rg -Fq 'DUKE13_CRC,  26524524' "$repo_dir/source/duke3d/src/grpscan.cpp"
 for adapter in "$dist_dir/adapters/blood.js" "$dist_dir/adapters/duke3d.js"; do
     for marker in 'ctx.framework.createOwnerDataSet' 'ctx.dataClient.load' \
-        'ctx.framework.mountOwnerFiles' 'preservePaths: true' "engine.FS.chmod('/game', 0o555)"; do
+        'ctx.framework.mountOwnerFiles' 'ctx.persistence.attach' 'controllerFrame(detail)' \
+        'preservePaths: true' "engine.FS.chmod('/game', 0o555)"; do
         rg -Fq "$marker" "$adapter" || { printf 'Missing adapter data-boundary marker: %s (%s)\n' "$marker" "$adapter" >&2; exit 1; }
     done
 done

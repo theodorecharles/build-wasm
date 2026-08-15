@@ -19,6 +19,8 @@ async function exercise(variant, expectedScript, expectedIntent) {
     inputCaptureChanged(captured, context) { calls.push(['capture', captured, context.variant]); },
     pointerMove(detail, event, context) { calls.push(['move', detail.x, event.type, context.variant]); },
     pointerButton(detail, event, context) { calls.push(['button', detail.button, event.type, context.variant]); },
+    controllerFrame(detail, context) { calls.push(['controllerFrame', detail.deltaMs, context.variant]); },
+    controllerChanged(detail, context) { calls.push(['controllerChanged', detail.selection, context.variant]); },
     preferencesChanged(values, context) { calls.push(['preferences', values.profile, context.variant]); },
     contextLost(event, context) { calls.push(['contextLost', event.type, context.variant]); },
     contextRestored(event, context) { calls.push(['contextRestored', event.type, context.variant]); }
@@ -52,12 +54,14 @@ async function exercise(variant, expectedScript, expectedIntent) {
   family.inputCaptureChanged(true, context);
   family.pointerMove({ x: 3 }, { type: 'mousemove' }, context);
   family.pointerButton({ button: 0 }, { type: 'mousedown' }, context);
+  family.controllerFrame({ deltaMs: 16 }, context);
+  family.controllerChanged({ selection: 'auto' }, context);
   family.preferencesChanged({ profile: 'classic' }, context);
   family.contextLost({ type: 'webglcontextlost' }, context);
   family.contextRestored({ type: 'webglcontextrestored' }, context);
   assert.deepEqual(calls.map(call => call[0]), [
     'init', 'start', 'state', ...(expectedIntent ? ['intent'] : []), 'resize', 'captureLost', 'capture', 'move', 'button',
-    'preferences', 'contextLost', 'contextRestored'
+    'controllerFrame', 'controllerChanged', 'preferences', 'contextLost', 'contextRestored'
   ]);
 }
 

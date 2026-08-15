@@ -9,6 +9,11 @@
 #include "polymost.h"
 #include "renderlayer.h"
 
+#ifdef __EMSCRIPTEN__
+# include <emscripten/emscripten.h>
+# include "scancodes.h"
+#endif
+
 #define MINICORO_IMPL
 #define MCO_LOG initprintf
 #define MCO_ASSERT Bassert
@@ -316,6 +321,35 @@ vec2_t  g_mouseAbs;
 int32_t g_mouseBits;
 uint8_t g_mouseClickState;
 
+#ifdef __EMSCRIPTEN__
+static int32_t g_wasmControllerMouseBits;
+static uint32_t g_wasmControllerKeys;
+
+static void wasmControllerKey(uint32_t const bit, int32_t const scan, uint32_t const next)
+{
+    if (!!(g_wasmControllerKeys & bit) != !!(next & bit))
+        keySetState(scan, !!(next & bit));
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE void Build_WasmControllerFrame(
+    uint32_t const keys, int32_t const mouseX, int32_t const mouseY, int32_t const mouseBits)
+{
+    static int32_t const scans[] = {
+        sc_W, sc_S, sc_A, sc_D, sc_Space, sc_LeftControl, sc_R, sc_Enter,
+        sc_LeftShift, sc_Tab, sc_Escape, sc_UpArrow, sc_DownArrow, sc_LeftArrow,
+        sc_RightArrow, sc_Q,
+    };
+
+    for (uint32_t bit = 0; bit < ARRAY_SIZE(scans); ++bit)
+        wasmControllerKey(1u << bit, scans[bit], keys);
+
+    g_wasmControllerKeys = keys;
+    g_wasmControllerMouseBits = mouseBits;
+    g_mousePos.x += mouseX;
+    g_mousePos.y += mouseY;
+}
+#endif
+
 bool g_mouseEnabled;
 bool g_mouseGrabbed;
 bool g_mouseInsideWindow   = 1;
@@ -367,7 +401,12 @@ int32_t mouseReadAbs(vec2_t * const pResult, vec2_t const * const pInput)
 
 int32_t mouseReadButtons(void)
 {
-    return (!g_mouseEnabled || !appactive || !g_mouseInsideWindow || (osd && osd->flags & OSD_CAPTURE)) ? 0 : g_mouseBits;
+    return (!g_mouseEnabled || !appactive || !g_mouseInsideWindow || (osd && osd->flags & OSD_CAPTURE)) ? 0 :
+        (g_mouseBits
+#ifdef __EMSCRIPTEN__
+         | g_wasmControllerMouseBits
+#endif
+        );
 }
 
 controllerinput_t joystick;

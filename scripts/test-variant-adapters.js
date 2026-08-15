@@ -23,6 +23,8 @@ for (const variant of ['blood', 'duke3d']) {
     `${variant} ready copy must describe the game rather than provisioning`);
   assert.ok(config.provisioningText, `${variant} missing-data copy is required`);
   assert.ok(config.pwa?.icons?.length, `${variant} needs PWA metadata`);
+  assert.equal(config.controller?.mode, 'wasdMouse');
+  assert.match(config.persistence?.root || '', /^\/home\/web_user\/\.config\//);
 }
 
 async function exercise(variant) {
@@ -67,6 +69,7 @@ async function exercise(variant) {
         module[`${prefix}SetPointerLock`] = value => calls.push(['capture', value]);
         module[`${prefix}ControlsMask`] = () => 31;
         module[`${prefix}FlushPersistence`] = () => calls.push(['flush']);
+        module._Build_WasmControllerFrame = (...values) => calls.push(['controller', ...values]);
         queueMicrotask(() => module.onRuntimeInitialized());
       }
     }
@@ -119,6 +122,16 @@ async function exercise(variant) {
         };
       }
     },
+    persistence: {
+      root: manifest.variants[variant].persistence.root,
+      async attach(FS, options) {
+        assert.equal(FS, module.FS);
+        assert.equal(options.root, manifest.variants[variant].persistence.root);
+        calls.push(['persistence', options.root]);
+      },
+      markDirty() { calls.push(['dirty']); },
+      async save() { calls.push(['save']); }
+    },
     shell: { resumeAudio() {}, engineState() { return transitions.at(-1) || 'launcher'; } },
     setLoading(...detail) { loading.push(detail); }, log() {},
     showRuntime(state) { transitions.push(state); },
@@ -142,11 +155,25 @@ async function exercise(variant) {
   assert.equal(adapter.readEngineState(), 'gameplay');
   assert.equal(transitions.at(-1), 'gameplay');
   assert.ok(calls.some(call => call[0] === 'mount'));
+  assert.ok(calls.some(call => call[0] === 'persistence'));
   const launch = calls.find(call => call[0] === 'callMain');
   assert.ok(launch);
   assert.ok(launch[1].includes('/game') || launch[1].includes('-game_dir=/game'));
   adapter.inputCaptureChanged(true);
   assert.deepEqual(calls.at(-1), ['capture', 1]);
+  adapter.controllerFrame({
+    deltaMs: 16,
+    actions: { forward: 1, right: 1, lookX: 0.5, lookY: -0.25, attack: 1, jump: 1 }
+  }, context);
+  const controllerCall = calls.at(-1);
+  assert.equal(controllerCall[0], 'controller');
+  assert.ok(controllerCall[1] & 1, 'controller forward must map to native W');
+  assert.ok(controllerCall[1] & 8, 'controller right must map to native D');
+  assert.ok(controllerCall[1] & 16, 'controller jump must map to native jump');
+  assert.ok(controllerCall[2] > 0, 'right stick must map to native horizontal mouse input');
+  assert.equal(controllerCall[4] & 1, 1, 'controller trigger must map to native attack');
+  adapter.controllerChanged({ activeIndex: null, selection: 'auto' }, context);
+  assert.deepEqual(calls.at(-1), ['controller', 0, 0, 0, 0], 'disconnect must release native controller state');
   if (isBlood) {
     const nativeSource = fs.readFileSync(path.join(repo, 'source/blood/src/blood.cpp'), 'utf8');
     assert.match(nativeSource, /gInputMode == INPUT_MODE_3[\s\S]*return 3;/,

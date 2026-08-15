@@ -52,6 +52,18 @@
         { "value": "classic", "label": "Classic — 800×600 software renderer" }
       ],
       "defaultProfile": "classic",
+      "persistence": {
+        "root": "/home/web_user/.config/nblood",
+        "debounceMs": 750,
+        "intervalMs": 5000,
+        "requestDurability": true
+      },
+      "controller": {
+        "mode": "wasdMouse",
+        "moveDeadzone": 0.18,
+        "lookDeadzone": 0.16,
+        "lookSensitivity": 0.62
+      },
       "provisioningText": "Select the required files from a One Unit Whole Blood folder. Optional Cryptic Passage, movies, demos, and OGG tracks are accepted when selected together and cached in this browser.",
       "theme": {
         "accent": "#9d1717",
@@ -96,6 +108,18 @@
         { "value": "classic", "label": "Classic — 800×600 software renderer" }
       ],
       "defaultProfile": "classic",
+      "persistence": {
+        "root": "/home/web_user/.config/eduke32",
+        "debounceMs": 750,
+        "intervalMs": 5000,
+        "requestDurability": true
+      },
+      "controller": {
+        "mode": "wasdMouse",
+        "moveDeadzone": 0.18,
+        "lookDeadzone": 0.16,
+        "lookSensitivity": 0.62
+      },
       "provisioningText": "Select DUKE3D.GRP from the 1.3d game folder. DUKE.RTS is optional. Matching files are cached in this browser after exact validation.",
       "theme": {
         "accent": "#b42318",

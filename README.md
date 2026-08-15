@@ -12,15 +12,22 @@ locked-title images without embedding game data.
 ## Browser contract
 
 The downstream emits only declarative configuration, a family adapter, native
-artifacts, and tracked source icons. wasm-game-framework 0.7.6 at immutable
-commit `e617f090deaa294dacd033afa52c09f811a3e690` owns HTML, CSS, the service
+artifacts, and tracked source icons. wasm-game-framework 0.8.0 at immutable
+commit `3aef7e84f2accde01a04eb4e7398f38132c992fc` owns HTML, CSS, the service
 worker, PWA manifests, fullscreen,
 input capture, launcher/loading/runtime state, `/data` provisioning, and
-origin-private IndexedDB caching.
+origin-private IndexedDB caching. It also owns the launch-card USB/Bluetooth
+controller selection and durable browser lifecycle for saves, configuration,
+and keybindings. The variant adapters translate normalized controller frames
+into native Build keyboard/mouse state; no synthetic DOM input is used.
 
 Both shipped variants use one honest classic configuration: SDL2/Web Audio, the 8-bit
 software renderer, a fixed 800×600 4:3 backbuffer, WASD defaults, horizontal
-mouse turning, and classic mouse-Y forward/back movement. Polymost/WebGL is not
+mouse turning, classic mouse-Y forward/back movement, and optional gamepad
+WASD/mouse controls. Blood saves/configuration use
+`/home/web_user/.config/nblood`; Duke uses
+`/home/web_user/.config/eduke32`. Both mount through framework IDBFS before
+native startup and flush on lifecycle transitions. Polymost/WebGL is not
 advertised because renderer selection, dynamic resizing, and runtime behavior
 have not yet received browser verification.
 
@@ -41,8 +48,8 @@ outside Git, image layers, and the public document root.
 
 This history descends from the NBlood project, which uses EDuke32 engine
 technology and includes the native `source/blood` and `source/duke3d` targets.
-The browser work does not reuse a third-party WebAssembly port and is not
-submitted upstream. Native authorship is retained in [AUTHORS.md](AUTHORS.md)
+The browser work does not reuse a third-party WebAssembly port. Native
+authorship is retained in [AUTHORS.md](AUTHORS.md)
 and the repository history.
 
 The broader source tree also contains other Build-engine games and tools; they
