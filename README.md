@@ -12,8 +12,8 @@ locked-title images without embedding game data.
 ## Browser contract
 
 The downstream emits only declarative configuration, a family adapter, native
-artifacts, and tracked source icons. wasm-game-framework 0.9.2 at immutable
-commit `53bc7e6eeef1ae35dcf3b25dea4e3ec0ab46726f` owns HTML, CSS, the service
+artifacts, and tracked source icons. wasm-game-framework 0.9.4 at immutable
+commit `c4ad3b9e075f881d32f044299fbfeee703a9169d` owns HTML, CSS, the service
 worker, PWA manifests, fullscreen,
 input capture, launcher/loading/runtime state, `/data` provisioning, and
 origin-private IndexedDB caching. It also owns the durable browser lifecycle

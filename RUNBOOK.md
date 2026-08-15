@@ -12,7 +12,7 @@ artifacts to Git, and do not contact upstream projects as part of a release.
 ## Architecture
 
 ```text
-wasm-game-framework 0.9.2 canonical document/server/PWA and persistence layer
+wasm-game-framework 0.9.4 canonical document/server/PWA and persistence layer
         |
 Build family config + variant adapter dispatch
         |

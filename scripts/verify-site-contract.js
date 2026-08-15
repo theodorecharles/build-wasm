@@ -18,13 +18,13 @@ const variants = ['blood', 'duke3d'];
 const statusDocs = ['README.md', 'RUNBOOK.md'].map(filename =>
   fs.readFileSync(path.join(repo, filename), 'utf8'));
 
-assert.equal(JSON.parse(fs.readFileSync(path.join(framework, 'package.json'), 'utf8')).version, '0.9.2');
-assert.equal(childProcess.execFileSync('git', ['-C', framework, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), '53bc7e6eeef1ae35dcf3b25dea4e3ec0ab46726f');
+assert.equal(JSON.parse(fs.readFileSync(path.join(framework, 'package.json'), 'utf8')).version, '0.9.4');
+assert.equal(childProcess.execFileSync('git', ['-C', framework, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), 'c4ad3b9e075f881d32f044299fbfeee703a9169d');
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wasm-game-framework.js')), true);
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wasm-game-bootstrap.js')), true);
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wolfwasm-shell.js')), false);
 if (fs.existsSync(dist)) {
-  assert.equal(JSON.parse(fs.readFileSync(path.join(dist, 'shared-shell', 'wasm-game-framework.json'), 'utf8')).version, '0.9.2');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(dist, 'shared-shell', 'wasm-game-framework.json'), 'utf8')).version, '0.9.4');
 }
 
 for (const contents of statusDocs) {
@@ -64,6 +64,7 @@ for (const key of variants) {
   assert.equal(variant.pixelated, true);
   assert.equal(variant.fps, false);
   assert.equal(variant.dynamicQuality, false);
+  assert.equal(variant.controller.mode, 'disabled');
   assert.deepEqual(variant.profiles.map(profile => profile.value), ['classic']);
   assert.equal(variant.defaultProfile, 'classic');
   assert.match(variant.description, /horizontal-only mouse look/);
@@ -80,6 +81,8 @@ for (const key of variants) {
     }
   }
 }
+assert.equal(config.variants.blood.menuCursor, 'none');
+assert.equal(config.variants.duke3d.menuCursor, 'native');
 
 const blood = data.variants.blood;
 assert.equal(blood.namespace, 'build-blood-retail');
@@ -122,4 +125,4 @@ for (const source of [bloodAdapter, dukeAdapter]) {
   assert.match(source, /preservePaths: true/);
 }
 
-console.log('Verified framework 0.9.2, persistence, controllers, family dispatch, fixed classic profiles, PWA metadata, and exact data contracts.');
+console.log('Verified framework 0.9.4, persistence, disabled controllers, cursor policy, family dispatch, fixed classic profiles, PWA metadata, and exact data contracts.');

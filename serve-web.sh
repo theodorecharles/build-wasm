@@ -6,8 +6,8 @@ port="${1:-8007}"
 variant="${2:-suite}"
 framework_dir="${WASM_FRAMEWORK_DIR:-$repo_dir/../wasm-game-framework}"
 data_root="${BUILD_WASM_DATA_ROOT:-$repo_dir/build-web/container-data}"
-required_framework_version="0.9.2"
-required_framework_commit="53bc7e6"
+required_framework_version="0.9.4"
+required_framework_commit="c4ad3b9"
 
 if [[ ! -f "$repo_dir/build-web/dist/wasm-game.json" ]]; then
     printf 'No browser build found. Run ./build-web.sh first.\n' >&2
