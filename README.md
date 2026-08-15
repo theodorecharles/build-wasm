@@ -13,7 +13,8 @@ locked-title images without embedding game data.
 
 The downstream emits only declarative configuration, a family adapter, native
 artifacts, and tracked source icons. wasm-game-framework 0.7.6 at immutable
-commit `e617f09` owns HTML, CSS, the service worker, PWA manifests, fullscreen,
+commit `e617f090deaa294dacd033afa52c09f811a3e690` owns HTML, CSS, the service
+worker, PWA manifests, fullscreen,
 input capture, launcher/loading/runtime state, `/data` provisioning, and
 origin-private IndexedDB caching.
 

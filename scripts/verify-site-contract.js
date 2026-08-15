@@ -19,7 +19,7 @@ const statusDocs = ['README.md', 'RUNBOOK.md'].map(filename =>
   fs.readFileSync(path.join(repo, filename), 'utf8'));
 
 assert.equal(JSON.parse(fs.readFileSync(path.join(framework, 'package.json'), 'utf8')).version, '0.7.6');
-assert.equal(childProcess.execFileSync('git', ['-C', framework, 'rev-parse', '--short=7', 'HEAD'], { encoding: 'utf8' }).trim(), 'e617f09');
+assert.equal(childProcess.execFileSync('git', ['-C', framework, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), 'e617f090deaa294dacd033afa52c09f811a3e690');
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wasm-game-framework.js')), true);
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wasm-game-bootstrap.js')), true);
 assert.equal(fs.existsSync(path.join(framework, 'dist', 'wolfwasm-shell.js')), false);

@@ -6,7 +6,7 @@ framework_dir="${WASM_FRAMEWORK_DIR:-$repo_dir/../wasm-game-framework}"
 namespace="${DOCKER_NAMESPACE:-}"
 tag="${DOCKER_TAG:-dev}"
 required_framework_version="0.7.6"
-required_framework_commit="e617f09"
+required_framework_commit="e617f090deaa294dacd033afa52c09f811a3e690"
 framework_version="$(node -p "require('${framework_dir}/package.json').version")"
 framework_commit="$(git -C "$framework_dir" rev-parse --short=7 HEAD)"
 
